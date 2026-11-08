@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHAMPIONS OF CALOR: Clash of Science – IPA SMP Kelas VII</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Background Arena Grid -->
+    <div class="arena-grid-bg"></div>
+
+    <!-- Confetti Canvas -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <!-- Top Navigation & Status Bar -->
+    <header class="app-topbar">
+        <div class="topbar-branding">
+            <span class="brand-badge">CoC SCIENCE</span>
+            <span class="brand-title">CHAMPIONS OF CALOR</span>
+        </div>
+
+        <div class="topbar-center-status">
+            <div class="active-team-chip" id="topActiveTeam">
+                <span class="active-team-indicator" style="background:#f59e0b"></span>
+                <span class="active-team-name">Tim Joule</span>
+            </div>
+            <div class="score-chip" id="topTeamScore">0 Poin</div>
+            <div class="timer-chip" title="Waktu Tantangan">
+                <span>⏱</span>
+                <span id="gameTimerDisplay">00:00</span>
+            </div>
+        </div>
+
+        <div class="topbar-actions">
+            <div class="firebase-status-chip" id="firebaseStatusBadge" onclick="engine.openFirebaseModal()" title="Klik untuk Pengaturan Firebase Live Database">
+                <span class="fb-dot disconnected"></span>
+                <span>Mode Lokal</span>
+            </div>
+            <button class="btn-icon-action" id="btnToggleScratchpad" title="Buka Cakar-Cakar Digital">
+                ✏️ <span>Kertas Cakar</span>
+            </button>
+            <button class="btn-icon-action" id="btnToggleSound" title="Matikan/Nyalakan Suara">
+                🔊 <span>Suara</span>
+            </button>
+            <button class="btn-icon-action" id="btnToggleFullscreen" title="Layar Penuh Proyektor">
+                ⤢ <span>Layar Penuh</span>
+            </button>
+            <button class="btn-icon-action" onclick="engine.renderLobby()" title="Kembali ke Menu Utama">
+                🏠 <span>Lobby</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Multi-Team Selector Bar (Visible if > 1 team) -->
+    <nav class="multi-team-bar hidden" id="multiTeamBar"></nav>
+
+    <!-- Main Screens Container -->
+    <main class="app-main">
+
+        <!-- =========================================================
+             SCREEN 1: LOBBY & SETUP ARENA
+        ========================================================= -->
+        <section class="app-screen" id="screenLobby">
+            <div class="hero-section">
+                <div class="hero-tag">⚡ TANTANGAN AKADEMIK SAINS COV ⚡</div>
+                <h1 class="hero-title">
+                    CLASH OF <span class="glow-gold">CHAMPIONS</span> : <span class="glow-cyan">EDISI KALOR</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Kompetisi sains kolaboratif materi <strong>Kalor & Perubahannya</strong> untuk siswa SMP Kelas VII. 
+                    Satukan pemikiran, pecahkan teka-teki, dan raih gelar Juara Laboratorium!
+                </p>
+
+                <!-- 4 Collaboration Pillars Banner -->
+                <div class="collab-pillars-grid">
+                    <div class="pillar-card">
+                        <div class="pillar-icon">🤝</div>
+                        <h4 class="pillar-title">1. Works Productively</h4>
+                        <p class="pillar-desc">Setiap anggota berkontribusi aktif mengemukakan ide dan membagi tugas.</p>
+                    </div>
+                    <div class="pillar-card">
+                        <div class="pillar-icon">👂</div>
+                        <h4 class="pillar-title">2. Demonstrates Respect</h4>
+                        <p class="pillar-desc">Saling mendengarkan, menghargai pendapat, dan tidak memotong penjelasan rekan.</p>
+                    </div>
+                    <div class="pillar-card">
+                        <div class="pillar-icon">⚖️</div>
+                        <h4 class="pillar-title">3. Compromises</h4>
+                        <p class="pillar-desc">Berdiskusi secara terbuka dan mencapai mufakat saat ada perbedaan jawaban.</p>
+                    </div>
+                    <div class="pillar-card">
+                        <div class="pillar-icon">🛡️</div>
+                        <h4 class="pillar-title">4. Shared Responsibility</h4>
+                        <p class="pillar-desc">Seluruh anggota bertanggung jawab bersama terhadap keputusan dan skor tim.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Setup Section -->
+            <div class="arena-card">
+                <div class="arena-card-header">
+                    <h3 class="arena-card-title">
+                        👥 Pendaftaran Kelompok & Pembagian Peran (3–4 Siswa)
+                    </h3>
+                    <button class="btn-icon-action" onclick="engine.addTeam()">+ Tambah Tim Lawan</button>
+                </div>
+
+                <div class="team-setup-grid" id="teamSetupList">
+                    <!-- Injected by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Game Selection Cards -->
+            <div class="game-modes-grid">
+                <!-- Mode A -->
+                <div class="game-mode-card">
+                    <div class="game-mode-header">
+                        <span class="game-letter-badge">PERMAINAN A</span>
+                        <span class="game-icon-visual">⛓️</span>
+                    </div>
+                    <h3 class="game-mode-title">NUMBER CHAINS</h3>
+                    <div class="game-mode-subtitle">Rantai Peristiwa Kalor</div>
+                    <p class="game-mode-desc">
+                        Latih ketelitian urutan peristiwa sains! Susun kartu proses pemanasan, perubahan wujud, dan perpindahan kalor menjadi rantai kronologis yang utuh dan logis.
+                    </p>
+                    <div class="game-mode-meta">
+                        <span>🎯 5 Tahapan Rantai</span> • <span>⏱️ 100 Poin / Tantangan</span>
+                    </div>
+                    <button class="btn-start-game" onclick="engine.startNumberChains()">
+                        Mulai Number Chains ▶
+                    </button>
+                </div>
+
+                <!-- Mode B -->
+                <div class="game-mode-card">
+                    <div class="game-mode-header">
+                        <span class="game-letter-badge">PERMAINAN B</span>
+                        <span class="game-icon-visual">🎯</span>
+                    </div>
+                    <h3 class="game-mode-title">START CHAMP</h3>
+                    <div class="game-mode-subtitle">Tantangan Mencocokkan Konsep</div>
+                    <p class="game-mode-desc">
+                        Identifikasi fenomena sehari-hari! Pasangkan ilustrasi gambar sains (konduksi, konveksi, radiasi, penyerapan & pelepasan kalor) dengan konsep fisika yang tepat.
+                    </p>
+                    <div class="game-mode-meta">
+                        <span>🎯 12 Ilustrasi Kasus</span> • <span>⏱️ 100 Poin / Ronde</span>
+                    </div>
+                    <button class="btn-start-game" onclick="engine.startStartChamp()">
+                        Mulai Start Champ ▶
+                    </button>
+                </div>
+
+                <!-- Mode C -->
+                <div class="game-mode-card">
+                    <div class="game-mode-header">
+                        <span class="game-letter-badge">PERMAINAN C</span>
+                        <span class="game-icon-visual">⚡</span>
+                    </div>
+                    <h3 class="game-mode-title">CRYPTARITHM WAR</h3>
+                    <div class="game-mode-subtitle">Teka-Teki Angka Kalor</div>
+                    <p class="game-mode-desc">
+                        Tantangan puncak ala Clash of Champions! Temukan angka dan digit misterius yang hilang berdasarkan persamaan matematis kalor (Q = m × c × ΔT & Asas Black).
+                    </p>
+                    <div class="game-mode-meta">
+                        <span>🎯 6 Soal Teka-Teki Logika</span> • <span>⏱️ 150 Poin / Soal</span>
+                    </div>
+                    <button class="btn-start-game" onclick="engine.startCryptarithm()">
+                        Mulai Cryptarithm War ▶
+                    </button>
+                </div>
+            </div>
+
+            <!-- View Final Podium Button -->
+            <div style="text-align: center; margin-bottom: 30px;">
+                <button class="btn-game-action secondary" onclick="engine.showFinalPodium()">
+                    🏆 Lihat Klasemen & Podium Juara
+                </button>
+            </div>
+        </section>
+
+        <!-- =========================================================
+             SCREEN 2: GAME A - NUMBER CHAINS
+        ========================================================= -->
+        <section class="app-screen hidden" id="screenNumberChains">
+            <div class="game-play-header">
+                <div class="game-play-top-row">
+                    <div class="game-badge-group">
+                        <span class="brand-badge">GAME A</span>
+                        <span class="game-stage-badge" id="chainBadge">Tingkat Dasar</span>
+                        <span class="active-team-name" id="chainTopic" style="color:var(--gold-light); font-weight:700;"></span>
+                    </div>
+                    <div class="game-progress-wrap">
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted);">
+                            <span>Progress Rantai</span>
+                            <span id="chainProgressText">Tantangan 1 dari 5</span>
+                        </div>
+                        <div class="game-progress-bar-bg">
+                            <div class="game-progress-bar-fill" id="chainProgressBar" style="width:20%"></div>
+                        </div>
+                    </div>
+                </div>
+                <h2 class="game-stage-title" id="chainTitle">Judul Rantai Peristiwa</h2>
+                <p class="game-stage-story" id="chainStory">Deskripsi tugas menyusun rantai urutan kalor.</p>
+            </div>
+
+            <!-- Collaboration Protocol Banner -->
+            <div class="collab-status-banner" id="collabStatusBanner">
+                <span>⏳ <strong>Konsensus Tim:</strong> Diskusikan urutan bersama seluruh anggota tim sebelum menekan periksa!</span>
+                <button class="btn-open-collab" onclick="engine.openCollaborationModal()">🤝 Kunci Kesepakatan Tim (+25 pt)</button>
+            </div>
+
+            <!-- Chain Cards Slots -->
+            <div class="chain-slots-container" id="chainSlotsContainer">
+                <!-- Injected by JavaScript -->
+            </div>
+
+            <!-- Feedback Alert Area -->
+            <div id="chainFeedback"></div>
+
+            <!-- Bottom Action Bar -->
+            <div class="game-bottom-action-bar">
+                <div class="action-left-group">
+                    <button class="btn-game-action secondary" onclick="engine.showChainHint()">
+                        💡 Petunjuk Diskusi
+                    </button>
+                    <button class="btn-game-action secondary" onclick="engine.renderChainStage()">
+                        🔄 Acak Ulang Kartu
+                    </button>
+                </div>
+                <div class="action-right-group">
+                    <button class="btn-game-action primary" id="btnCheckChain" onclick="engine.checkChainAnswer()">
+                        ✓ Periksa Jawaban Rantai
+                    </button>
+                    <button class="btn-game-action success hidden" id="btnNextChain" onclick="engine.nextChainStage()">
+                        Lanjut Tantangan Berikutnya ➔
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================
+             SCREEN 3: GAME B - START CHAMP (MATCHING)
+        ========================================================= -->
+        <section class="app-screen hidden" id="screenStartChamp">
+            <div class="game-play-header">
+                <div class="game-play-top-row">
+                    <div class="game-badge-group">
+                        <span class="brand-badge">GAME B</span>
+                        <span class="game-stage-badge">Mencocokkan Konsep</span>
+                    </div>
+                    <div class="game-progress-wrap">
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted);">
+                            <span>Progress Ronde</span>
+                            <span id="matchProgressText">Ronde 1 dari 3</span>
+                        </div>
+                        <div class="game-progress-bar-bg">
+                            <div class="game-progress-bar-fill" id="matchProgressBar" style="width:33%"></div>
+                        </div>
+                    </div>
+                </div>
+                <h2 class="game-stage-title">START CHAMP : ARENA PENCOCOKAN KONSEP</h2>
+                <p class="game-stage-story">
+                    Pilih kartu peristiwa di kolom kiri, lalu pilih konsep fisika kalor yang paling sesuai di kolom kanan. 
+                    Diskusikan secara matang bersama anggota kelompok!
+                </p>
+            </div>
+
+            <!-- Collaboration Protocol Banner -->
+            <div class="collab-status-banner">
+                <span>🤝 <strong>Prinsip Kerja Sama:</strong> Pastikan Juru Bicara, Pengamat Konsep, dan Verifikator telah bersepakat.</span>
+                <button class="btn-open-collab" onclick="engine.openCollaborationModal()">Kunci Kesepakatan Tim (+25 pt)</button>
+            </div>
+
+            <!-- Matching Arena Grid -->
+            <div class="matching-arena-grid">
+                <!-- Left: Scenarios -->
+                <div class="match-scenarios-column" id="matchScenariosContainer">
+                    <!-- Injected by JavaScript -->
+                </div>
+
+                <!-- Right: Concept Targets -->
+                <div class="match-concepts-column">
+                    <h3 class="concepts-column-title">🎯 Bank Konsep Sains</h3>
+                    <p class="concepts-column-subtitle">Klik salah satu konsep di bawah untuk memasangkannya dengan kartu yang dipilih:</p>
+                    <div class="concepts-btn-grid" id="matchConceptsContainer">
+                        <!-- Injected by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedback Alert Area -->
+            <div id="matchFeedback"></div>
+
+            <!-- Bottom Action Bar -->
+            <div class="game-bottom-action-bar">
+                <div class="action-left-group">
+                    <button class="btn-game-action secondary" onclick="engine.renderMatchRound()">
+                        🔄 Reset Pilihan Ronde Ini
+                    </button>
+                </div>
+                <div class="action-right-group">
+                    <button class="btn-game-action primary" id="btnCheckMatch" onclick="engine.checkMatchAnswer()">
+                        ✓ Periksa Semua Pasangan
+                    </button>
+                    <button class="btn-game-action success hidden" id="btnNextMatch" onclick="engine.nextMatchRound()">
+                        Lanjut Ronde Berikutnya ➔
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================
+             SCREEN 4: GAME C - CRYPTARITHM WAR
+        ========================================================= -->
+        <section class="app-screen hidden" id="screenCryptarithm">
+            <div class="game-play-header">
+                <div class="game-play-top-row">
+                    <div class="game-badge-group">
+                        <span class="brand-badge">GAME C</span>
+                        <span class="game-stage-badge" id="cryptoBadge">Level 1</span>
+                    </div>
+                    <div class="game-progress-wrap">
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted);">
+                            <span>Progress Teka-Teki</span>
+                            <span id="cryptoProgressText">Teka-Teki 1 dari 6</span>
+                        </div>
+                        <div class="game-progress-bar-bg">
+                            <div class="game-progress-bar-fill" id="cryptoProgressBar" style="width:16%"></div>
+                        </div>
+                    </div>
+                </div>
+                <h2 class="game-stage-title" id="cryptoTitle">Teka-Teki Angka Kalor</h2>
+                <p class="game-stage-story" id="cryptoStory">Deskripsi teka-teki kalor.</p>
+            </div>
+
+            <!-- Collaboration Protocol Banner -->
+            <div class="collab-status-banner">
+                <span>🔢 <strong>Kerja Sama Perhitungan:</strong> Master Hitung memimpin pencarian angka, anggota lain memverifikasi rumus!</span>
+                <button class="btn-open-collab" onclick="engine.openCollaborationModal()">Kunci Kesepakatan Tim (+25 pt)</button>
+            </div>
+
+            <!-- Layout: Puzzle Card + Numpad -->
+            <div class="crypto-arena-layout">
+                <div class="crypto-puzzle-card">
+                    <span class="crypto-formula-tag" id="cryptoFormula">Rumus: Q = m × c × ΔT</span>
+
+                    <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase;">Data yang Diketahui:</h4>
+                    <div class="crypto-givens-grid" id="cryptoGivensList">
+                        <!-- Injected by JavaScript -->
+                    </div>
+
+                    <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase;">Persamaan Sandi CoC:</h4>
+                    <div class="crypto-equation-box" id="cryptoEquationDisplay">
+                        <!-- Injected by JavaScript -->
+                    </div>
+
+                    <h4 style="font-size:0.85rem; color:var(--gold-light); margin-bottom:12px; text-align:center;">Masukkan Angka Jawaban Kelompok:</h4>
+                    <div class="crypto-inputs-wrapper" id="cryptoInputsContainer">
+                        <!-- Injected by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Touch / Click Numpad -->
+                <div class="crypto-tools-column">
+                    <div class="numpad-card">
+                        <div class="numpad-header">
+                            <span>Papan Angka Digital</span>
+                            <small>Klik atau ketik via keyboard</small>
+                        </div>
+                        <div class="numpad-grid">
+                            <button class="btn-numpad" onclick="engine.numpadInput('1')">1</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('2')">2</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('3')">3</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('4')">4</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('5')">5</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('6')">6</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('7')">7</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('8')">8</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('9')">9</button>
+                            <button class="btn-numpad action" onclick="engine.numpadClear()">C</button>
+                            <button class="btn-numpad" onclick="engine.numpadInput('0')">0</button>
+                            <button class="btn-numpad action" onclick="engine.numpadBackspace()">⌫</button>
+                        </div>
+                    </div>
+
+                    <div style="text-align:center;">
+                        <button class="btn-game-action secondary" style="width:100%;" onclick="document.getElementById('scratchpadDrawer').classList.add('open')">
+                            ✏️ Buka Kertas Cakar Layar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedback Alert Area -->
+            <div id="cryptoFeedback"></div>
+
+            <!-- Bottom Action Bar -->
+            <div class="game-bottom-action-bar">
+                <div class="action-left-group">
+                    <button class="btn-game-action secondary" onclick="engine.showCryptoHint()">
+                        💡 Petunjuk Hitungan
+                    </button>
+                </div>
+                <div class="action-right-group">
+                    <button class="btn-game-action primary" id="btnCheckCrypto" onclick="engine.checkCryptoAnswer()">
+                        ✓ Periksa Angka Sandi
+                    </button>
+                    <button class="btn-game-action success hidden" id="btnNextCrypto" onclick="engine.nextCryptoStage()">
+                        Lanjut Soal Berikutnya ➔
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================
+             SCREEN 5: FINAL PODIUM & CERTIFICATE
+        ========================================================= -->
+        <section class="app-screen hidden" id="screenPodium">
+            <div class="podium-container">
+                <div class="podium-hero-icon">🏆</div>
+                <h1 class="podium-title">KLASEMEN AKHIR JUARA SAINS</h1>
+                <p class="podium-subtitle">
+                    Selamat kepada seluruh kelompok atas kolaborasi gemilang, dedikasi logika, dan pemahaman konsep kalor!
+                </p>
+
+                <!-- Podium Cards Grid -->
+                <div class="podium-rankings-grid" id="podiumRankings">
+                    <!-- Injected by JavaScript -->
+                </div>
+
+                <div class="podium-actions">
+                    <button class="btn-game-action primary" onclick="engine.printCertificate()">
+                        🖨️ Cetak Rekapitulasi & Sertifikat
+                    </button>
+                    <button class="btn-game-action secondary" onclick="engine.renderLobby()">
+                        🏠 Kembali ke Lobby
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- =========================================================
+         FLOATING SCRATCHPAD / WHITEBOARD DRAWER
+    ========================================================= -->
+    <aside class="scratchpad-drawer" id="scratchpadDrawer">
+        <div class="scratchpad-header">
+            <span class="scratchpad-title">✏️ Kertas Cakar Digital Siswa</span>
+            <button class="modal-close-btn" id="btnCloseScratchpad">✕</button>
+        </div>
+        <div class="scratchpad-toolbar">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Warna:</span>
+            <span class="color-dot" style="background:#f59e0b" onclick="scratchpad.setColor('#f59e0b')"></span>
+            <span class="color-dot" style="background:#06b6d4" onclick="scratchpad.setColor('#06b6d4')"></span>
+            <span class="color-dot" style="background:#10b981" onclick="scratchpad.setColor('#10b981')"></span>
+            <span class="color-dot" style="background:#ffffff" onclick="scratchpad.setColor('#ffffff')"></span>
+            <button class="btn-tool-icon" onclick="scratchpad.undo()" style="margin-left:auto;">↩ Undo</button>
+            <button class="btn-tool-icon" onclick="scratchpad.clear()">🗑 Hapus</button>
+        </div>
+        <div class="scratchpad-canvas-wrap">
+            <canvas id="scratchpadCanvas"></canvas>
+        </div>
+    </aside>
+
+    <!-- =========================================================
+         MODALS: EXPLANATION, COLLABORATION, INFO, COMPLETE
+    ========================================================= -->
+    <!-- 1. Scientific Explanation Modal -->
+    <div class="modal-overlay hidden" id="explanationModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalExpTitle">Pembahasan Ilmiah Kalor</h3>
+                <button class="modal-close-btn" onclick="engine.closeExplanationModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p id="modalExpSummary" style="font-weight:600; color:var(--cyan-light); margin-bottom:12px;"></p>
+                <h4 style="font-size:0.9rem; color:var(--text-secondary); text-transform:uppercase;">Poin Penting Konsep:</h4>
+                <ul class="modal-keypoints-list" id="modalExpKeyPoints"></ul>
+                <div class="modal-fact-box" id="modalExpFact"></div>
+            </div>
+            <div style="text-align:right; margin-top:20px;">
+                <button class="btn-game-action primary" onclick="engine.closeExplanationModal()">
+                    Paham & Lanjutkan 👍
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Collaboration Protocol Modal -->
+    <div class="modal-overlay hidden" id="collabModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">🤝 Protokol Konsensus Kelompok CoC</h3>
+                <button class="modal-close-btn" onclick="document.getElementById('collabModal').classList.add('hidden')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>Kelompok <strong id="collabTeamName" style="color:var(--gold-light);"></strong>, pastikan empat aspek kolaborasi telah dipenuhi sebelum menetapkan jawaban:</p>
+                
+                <div class="collab-rules-box">
+                    <div class="collab-rule-item">
+                        <span class="collab-rule-icon">✅</span>
+                        <div class="collab-rule-text">
+                            <strong>1. Works Productively:</strong> Semua anggota telah berpartisipasi dan menyampaikan pemikirannya.
+                        </div>
+                    </div>
+                    <div class="collab-rule-item">
+                        <span class="collab-rule-icon">✅</span>
+                        <div class="collab-rule-text">
+                            <strong>2. Demonstrates Respect:</strong> Tidak ada yang memotong pembicaraan atau meremehkan pendapat rekan.
+                        </div>
+                    </div>
+                    <div class="collab-rule-item">
+                        <span class="collab-rule-icon">✅</span>
+                        <div class="collab-rule-text">
+                            <strong>3. Compromises:</strong> Telah terjadi musyawarah dan kesepakatan bersama jika ada pilihan jawaban yang berbeda.
+                        </div>
+                    </div>
+                    <div class="collab-rule-item">
+                        <span class="collab-rule-icon">✅</span>
+                        <div class="collab-rule-text">
+                            <strong>4. Shared Responsibility:</strong> Seluruh anggota kelompok siap menanggung hasil dan skor bersama secara sportif.
+                        </div>
+                    </div>
+                </div>
+
+                <h4 style="font-size:0.85rem; color:var(--text-muted); text-transform:uppercase;">Anggota Tim & Peran:</h4>
+                <div class="collab-members-preview" id="collabMembersList"></div>
+            </div>
+            <div style="text-align:right; margin-top:20px;">
+                <button class="btn-game-action success" onclick="engine.confirmCollaboration()">
+                    ✓ Kami Semua Telah Sepakat (+25 Bonus Poin)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. General Info / Hint Modal -->
+    <div class="modal-overlay hidden" id="infoModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title" id="infoModalTitle">Petunjuk Tantangan</h3>
+                <button class="modal-close-btn" onclick="engine.closeInfoModal()">✕</button>
+            </div>
+            <div class="modal-body" id="infoModalBody"></div>
+            <div style="text-align:right; margin-top:20px;">
+                <button class="btn-game-action secondary" onclick="engine.closeInfoModal()">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Game Complete Modal -->
+    <div class="modal-overlay hidden" id="completeModal">
+        <div class="modal-card" style="text-align:center;">
+            <div style="font-size:3.5rem; margin-bottom:12px;">🎉</div>
+            <h3 class="modal-title" id="completeModalTitle" style="font-size:1.8rem; margin-bottom:12px;">Tantangan Selesai!</h3>
+            <p id="completeModalMessage" style="font-size:1.05rem; color:var(--text-secondary); margin-bottom:24px; line-height:1.6;"></p>
+            <div>
+                <button class="btn-game-action primary" id="btnCompleteDone">
+                    Lanjut ke Klasemen / Menu Utama ➔
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Firebase Live Database Modal -->
+    <div class="modal-overlay hidden" id="firebaseModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">🔥 Pengaturan Firebase Live Database</h3>
+                <button class="modal-close-btn" onclick="engine.closeFirebaseModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:14px;">
+                    Hubungkan game ke Firebase Realtime Database untuk sinkronisasi nilai antarkelompok secara langsung ke proyektor kelas atau antarlaptop siswa.
+                </p>
+
+                <div class="fb-form-group">
+                    <label class="fb-form-label">Kode Room Kelas (Sesi Live):</label>
+                    <input type="text" class="fb-input-text" id="fbRoomInput" value="COC-KALOR-7A" placeholder="Contoh: KELAS-7A-KALOR">
+                </div>
+
+                <div class="fb-form-group">
+                    <label class="fb-form-label">Bagikan Link Room ke Siswa / Proyektor:</label>
+                    <div class="share-link-group">
+                        <input type="text" class="fb-input-text" id="fbShareLink" readonly>
+                        <button class="btn-game-action secondary" onclick="engine.copyShareLink()">📋 Salin</button>
+                    </div>
+                </div>
+
+                <div class="fb-form-group">
+                    <label class="fb-form-label">Konfigurasi Firebase Web (Opsional - Default Demo):</label>
+                    <textarea class="fb-textarea" id="fbConfigInput" placeholder='Paste firebaseConfig JSON di sini:
+{
+  "apiKey": "AIzaSy...",
+  "databaseURL": "https://nama-proyek-default-rtdb.firebaseio.com",
+  "projectId": "nama-proyek"
+}'></textarea>
+                    <small style="color:var(--text-muted); font-size:0.75rem;">
+                        💡 <em>Tips:</em> Buat Firebase Realtime Database di <a href="https://console.firebase.google.com" target="_blank" style="color:var(--gold-light);">console.firebase.google.com</a> dan salin konfigurasi web ke kotak ini. Tanpa konfigurasi, game tetap dapat dimainkan offline.
+                    </small>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                <button class="btn-game-action secondary" onclick="engine.closeFirebaseModal()">Tutup</button>
+                <button class="btn-game-action primary" onclick="engine.saveFirebaseConfig()">
+                    💾 Simpan & Sinkronkan Sesi
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Element -->
+    <div class="game-toast hidden" id="gameToast"></div>
+
+    <!-- Firebase SDK (Compat Version via Google CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+    <!-- Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/data-chains.js"></script>
+    <script src="js/data-matching.js"></script>
+    <script src="js/data-cryptarithm.js"></script>
+    <script src="js/scratchpad.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/engine.js"></script>
+</body>
+</html>
