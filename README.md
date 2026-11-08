@@ -8,28 +8,33 @@ Terinspirasi dari atmosfer kompetisi akademik **Clash of Champions (CoC)**.
 
 Aplikasi ini menggunakan **satu link website yang sama** dengan 2 mode tampilan terintegrasi:
 
-### 1. 👨‍🏫 Peran GURU (Admin & Layar Proyektor Kelas)
-- **Perangkat:** Laptop / Komputer Guru yang terhubung ke **Proyektor Kelas** atau Smart Board.
+### 1. 👨‍🏫 Peran GURU (Dasbor Admin & Pengawas di Laptop)
+- **Perangkat:** Laptop / Komputer Guru di meja (tanpa perlu proyektor).
 - **Fitur Utama Guru:**
-  - **Banner Kode Room Raksasa (Contoh: `COC-7A`):** Terpampang besar di layar proyektor agar mudah dibaca oleh seluruh siswa dari bangku mana pun.
-  - **Salin Kode & Link Siswa:** Sekali klik untuk menyalin kode room atau tautan langsung siswa.
-  - **Papan Klasemen Arena Live (Realtime Firebase):** Memantau seluruh kelompok siswa secara *live*. Saat siswa menjawab soal di HP mereka, nama kelompok, anggota tim, progres tantangan, dan skor totalnya **otomatis bergerak naik/turun di layar proyektor tanpa perlu di-refresh**.
-  - **Kontrol Sesi Kelas:** Membuat kode room acak baru, membuka panggung juara akhir (Podium), dan mencetak piagam/rekap nilai.
+  - **Kode Room Sesi Kelas (Contoh: `COC-7A`):** Guru cukup memberikan kode room ini ke siswa atau membagikan link ke grup WhatsApp kelas.
+  - **Salin Kode & Tautan Siswa:** Sekali klik untuk menyalin kode room atau link bergabung siswa.
+  - **Dasbor Aktivitas & Klasemen Live (Realtime Firebase):** Guru mengawasi seluruh kelompok langsung dari layar laptop:
+    - Jumlah total kelompok yang bergabung.
+    - Kelompok yang sedang memimpin perolehan nilai.
+    - Soal / tantangan apa yang sedang dikerjakan masing-masing kelompok (*misal: "Tim Joule sedang di Game A Rantai 3", "Tim Newton sedang di Game C Soal 4"*).
+    - Skor tiap game (Rantai, Konsep, Kriptaritma, Bonus Kolaborasi) dan skor total.
+    - Skor otomatis bergerak naik secara realtime tanpa perlu refresh halaman.
+  - **Tindakan Guru:** Mengumumkan pemenang / membuka panggung juara akhir (Podium) dan mencetak piagam/rekapitulasi nilai siswa.
 
 ### 2. 📱 Peran SISWA (Gawai HP Kelompok – 1 HP untuk 3–4 Siswa)
-- **Perangkat:** Cukup **1 HP pintar untuk satu kelompok** (3–4 siswa berkolaborasi bersama).
+- **Perangkat:** Cukup **1 HP pintar untuk satu kelompok** (digunakan bersama oleh 3–4 siswa yang berdiskusi).
 - **Alur Siswa di HP:**
-  1. Siswa membuka web game di HP dan memilih **📱 Siswa (HP Kelompok)**.
+  1. Siswa membuka web game di HP dan memilih **📱 Arena Siswa (HP Kelompok)**.
   2. Masukkan **Kode Room dari Guru** (misal: `COC-7A`).
   3. Masukkan **Nama Kelompok** (misal: *Tim Joule*, *Tim Newton*, *Tim Kelvin*).
   4. Masukkan **Nama 3–4 Anggota** beserta peran kolaborasi:
-     - 👑 **Juru Bicara:** Memimpin presentasi dan keputusan akhir.
+     - 👑 **Juru Bicara:** Memimpin presentasi dan keputusan akhir kelompok.
      - 🔍 **Pakar Konsep:** Menganalisis fenomena fisika kalor.
-     - 🔢 **Master Hitung:** Menghitung rumus matematis kalor.
+     - 🔢 **Master Hitung:** Menghitung rumus matematis persamaan kalor.
      - ⚖️ **Verifikator:** Memastikan seluruh anggota tim telah sepakat.
   5. Mainkan 3 jenis game (Game A: Number Chains, Game B: Start Champ, Game C: Cryptarithm War).
-  6. Setiap kelompok mendapatkan poin, skor di HP dan di proyektor guru **langsung sinkron seketika melalui Firebase**!
-  7. Pada layar HP siswa terdapat status: *Nama Tim • Peringkat di Kelas • Poin Total*.
+  6. Setiap kali kelompok menjawab benar, skor kelompok dan progres aktivitasnya **seketika langsung terkirim ke laptop guru melalui Firebase Realtime Database**!
+  7. Pada layar HP siswa terdapat status bar sticky: *Nama Tim • Peringkat di Kelas • Poin Total*.
 
 ---
 

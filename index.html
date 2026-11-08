@@ -29,10 +29,10 @@
         <!-- Role Switcher (Guru vs Siswa) -->
         <div class="role-toggle-group">
             <button class="btn-role-tab" id="btnRoleGuru" onclick="engine.setRole('guru')">
-                👨‍🏫 <span>Guru (Proyektor)</span>
+                👨‍🏫 <span>Dasbor Guru (Laptop)</span>
             </button>
             <button class="btn-role-tab active" id="btnRoleSiswa" onclick="engine.setRole('siswa')">
-                📱 <span>Siswa (HP Kelompok)</span>
+                📱 <span>Arena Siswa (HP Kelompok)</span>
             </button>
         </div>
 
@@ -47,7 +47,7 @@
             <button class="btn-icon-action" id="btnToggleSound" title="Matikan/Nyalakan Suara">
                 🔊 <span>Suara</span>
             </button>
-            <button class="btn-icon-action" id="btnToggleFullscreen" title="Layar Penuh Proyektor">
+            <button class="btn-icon-action" id="btnToggleFullscreen" title="Layar Penuh">
                 ⤢ <span>Layar Penuh</span>
             </button>
             <button class="btn-icon-action" onclick="engine.renderLobby()" title="Kembali ke Menu Utama">
@@ -65,40 +65,71 @@
         <section class="app-screen" id="screenLobby">
             
             <!-- -----------------------------------------------------
-                 TAMPILAN KHUSUS GURU (ADMIN & PROYEKTOR KELAS)
+                 TAMPILAN KHUSUS GURU (DASBOR PENGAWASAN LAPTOP)
             ----------------------------------------------------- -->
             <div id="viewGuru" class="hidden">
-                <!-- Jumbo Banner Kode Room untuk Proyektor -->
-                <div class="guru-projector-banner">
-                    <span class="guru-banner-tag">PAPAN KONTROL GURU (LAYAR PROYEKTOR KELAS)</span>
-                    <h2 class="guru-banner-title">Minta Siswa Membuka Web di HP Kelompok & Masukkan Kode:</h2>
-                    <div class="guru-banner-code active-room-display">COC-7A</div>
-                    <div class="guru-banner-actions">
+                <!-- Dashboard Kontrol Guru di Laptop -->
+                <div class="guru-dashboard-card">
+                    <div class="guru-dash-header">
+                        <div class="guru-dash-title-wrap">
+                            <h2>👨‍🏫 Dasbor Pengawasan Guru (Laptop)</h2>
+                            <p>Pantau jalannya kompetisi kalor antarkelompok secara realtime langsung dari laptop Anda. Siswa bermain secara berkelompok (1 HP per 3–4 orang).</p>
+                        </div>
+                        <div class="room-code-badge-large">
+                            <span>KODE ROOM KELAS</span>
+                            <strong class="active-room-display">COC-7A</strong>
+                        </div>
+                    </div>
+
+                    <!-- Statistik Kelas Realtime -->
+                    <div class="guru-stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-label">👥 Total Kelompok</span>
+                            <div class="stat-val cyan" id="statTotalTeams">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">🥇 Kelompok Terdepan</span>
+                            <div class="stat-val gold" id="statLeadingTeam" style="font-size:1.25rem;">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">📈 Rata-Rata Skor Kelas</span>
+                            <div class="stat-val" id="statAvgScore">0 <small style="font-size:0.9rem; font-weight:normal; color:var(--text-muted);">pt</small></div>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">⚡ Status Database</span>
+                            <div class="stat-val" style="font-size:1rem; color:#10b981; display:flex; align-items:center; gap:8px;">
+                                <span class="live-dot online"></span> Firebase Live
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tombol Kontrol Guru -->
+                    <div class="guru-actions-row">
                         <button class="btn-game-action primary" onclick="engine.copyTeacherCodeOnly()">
                             📋 Salin Kode Guru
                         </button>
                         <button class="btn-game-action secondary" onclick="engine.copyTeacherFullLink()">
-                            🔗 Salin Link Lengkap Siswa
+                            🔗 Salin Link Siswa (Kirim ke WhatsApp/Grup Kelas)
                         </button>
                         <button class="btn-game-action secondary" onclick="engine.teacherGenerateNewCode()">
                             🔄 Buat Kode Baru
                         </button>
                         <button class="btn-game-action secondary" onclick="engine.showFinalPodium()">
-                            🏆 Tampilkan Podium Juara
+                            🏆 Buka Panggung Juara Akhir
                         </button>
                         <button class="btn-game-action secondary" style="color:var(--red-wrong);" onclick="engine.teacherResetSession()">
-                            🗑 Reset Sesi Kelas
+                            🗑 Bersihkan Sesi Kelas
                         </button>
                     </div>
                 </div>
 
-                <!-- Live Leaderboard Proyektor (Realtime) -->
+                <!-- Live Leaderboard Monitor untuk Laptop Guru -->
                 <div class="live-leaderboard-card">
                     <div class="leaderboard-header-bar">
-                        <h3 style="font-size:1.3rem; font-weight:800; color:#fff; display:flex; align-items:center; gap:10px;">
-                            <span>📡 Klasemen Live Antarkelompok (Realtime Firebase)</span>
+                        <h3 style="font-size:1.2rem; font-weight:800; color:#fff; display:flex; align-items:center; gap:10px;">
+                            <span>📡 Aktivitas & Skor Kelompok Siswa Terkini (Live Monitor)</span>
                         </h3>
-                        <small style="color:var(--cyan-light);">Data otomatis diperbarui saat siswa menjawab di HP</small>
+                        <small style="color:var(--cyan-light);">Data otomatis bergerak seketika saat kelompok menjawab di HP</small>
                     </div>
                     <div id="teacherLiveLeaderboardTable">
                         <!-- Diinjeksi otomatis oleh JavaScript -->
@@ -111,26 +142,26 @@
                         <h3 class="arena-card-title">🎮 Preview Soal Tantangan (Untuk Guru)</h3>
                     </div>
                     <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:16px;">
-                        Guru dapat mendemokan jenis tantangan kalor berikut di layar proyektor jika diperlukan:
+                        Guru dapat meninjau jenis tantangan kalor berikut di laptop jika diperlukan:
                     </p>
                     <div class="game-modes-grid">
                         <div class="game-mode-card">
                             <span class="game-letter-badge">GAME A</span>
                             <h4 class="game-mode-title">NUMBER CHAINS</h4>
                             <p class="game-mode-desc">Rantai Peristiwa Kalor (5 Tahapan Urutan Fisika).</p>
-                            <button class="btn-start-game" onclick="engine.startNumberChains()">Demo Game A ▶</button>
+                            <button class="btn-start-game" onclick="engine.startNumberChains()">Preview Game A ▶</button>
                         </div>
                         <div class="game-mode-card">
                             <span class="game-letter-badge">GAME B</span>
                             <h4 class="game-mode-title">START CHAMP</h4>
                             <p class="game-mode-desc">Mencocokkan Konsep Kalor Sehari-hari (12 Kasus Ilustrasi).</p>
-                            <button class="btn-start-game" onclick="engine.startStartChamp()">Demo Game B ▶</button>
+                            <button class="btn-start-game" onclick="engine.startStartChamp()">Preview Game B ▶</button>
                         </div>
                         <div class="game-mode-card">
                             <span class="game-letter-badge">GAME C</span>
                             <h4 class="game-mode-title">CRYPTARITHM WAR</h4>
                             <p class="game-mode-desc">Teka-Teki Angka Kalor & Asas Black (6 Level Logika).</p>
-                            <button class="btn-start-game" onclick="engine.startCryptarithm()">Demo Game C ▶</button>
+                            <button class="btn-start-game" onclick="engine.startCryptarithm()">Preview Game C ▶</button>
                         </div>
                     </div>
                 </div>
@@ -169,7 +200,7 @@
                     <!-- Kode Room dari Guru -->
                     <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:12px; margin-bottom:16px;">
                         <label style="font-size:0.8rem; font-weight:700; color:var(--cyan-light); display:block; margin-bottom:6px;">
-                            🔑 Kode Room dari Guru di Proyektor:
+                            🔑 Kode Room dari Guru:
                         </label>
                         <div style="display:flex; gap:8px;">
                             <input type="text" id="studentRoomInputLobby" class="fb-input-text" style="flex:1; text-transform:uppercase; font-size:1.1rem; font-weight:800;" value="COC-7A" placeholder="Contoh: COC-7A">

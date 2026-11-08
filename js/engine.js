@@ -262,34 +262,56 @@ class CoCGameEngine {
     }
 
     // ----------------------------------------------------
-    // ROLE GURU: MONITOR LIVE LEADERBOARD PROYEKTOR
+    // ROLE GURU: DASBOR PENGAWASAN LAPTOP
     // ----------------------------------------------------
     renderTeacherLiveMonitor() {
         const container = document.getElementById('teacherLiveLeaderboardTable');
-        if (!container) return;
-
         const roomCode = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
         document.querySelectorAll('.active-room-display').forEach(el => el.textContent = roomCode);
 
-        if (this.allRoomTeams.length === 0) {
+        // Hitung statistik kelas realtime
+        const totalTeams = this.allRoomTeams.length;
+        const statTotal = document.getElementById('statTotalTeams');
+        if (statTotal) statTotal.textContent = totalTeams;
+
+        const sorted = [...this.allRoomTeams].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+        
+        const statLeading = document.getElementById('statLeadingTeam');
+        if (statLeading) {
+            statLeading.textContent = (sorted.length > 0 && sorted[0].name) ? sorted[0].name : '-';
+        }
+
+        const statAvg = document.getElementById('statAvgScore');
+        if (statAvg) {
+            if (totalTeams > 0) {
+                const sum = sorted.reduce((acc, curr) => acc + (curr.totalScore || 0), 0);
+                statAvg.textContent = Math.round(sum / totalTeams);
+            } else {
+                statAvg.textContent = "0";
+            }
+        }
+
+        if (!container) return;
+
+        if (totalTeams === 0) {
             container.innerHTML = `
                 <div class="empty-teams-notice">
                     <div style="font-size:2.2rem; margin-bottom:8px;">⏳</div>
                     <h4>Belum Ada Kelompok Siswa yang Bergabung</h4>
-                    <p>Minta siswa membuka web di HP masing-masing dan memasukkan kode room: <strong style="color:var(--gold-light); font-size:1.1rem;">${roomCode}</strong></p>
+                    <p>Berikan kode room ke siswa: <strong style="color:var(--gold-light); font-size:1.2rem;">${roomCode}</strong></p>
+                    <small style="color:var(--text-muted)">Setiap kelompok (1 HP per 3–4 siswa) memasukkan kode room ini untuk mulai bertanding.</small>
                 </div>
             `;
             return;
         }
 
-        const sorted = [...this.allRoomTeams].sort((a, b) => b.totalScore - a.totalScore);
         const medals = ['🥇', '🥈', '🥉', '⭐'];
 
         container.innerHTML = `
             <div class="leaderboard-table-header">
                 <span>Peringkat</span>
                 <span>Nama Kelompok & Anggota</span>
-                <span>Progres Game</span>
+                <span>Aktivitas Soal Saat Ini</span>
                 <span>Skor Total</span>
             </div>
             ${sorted.map((t, idx) => `
@@ -305,6 +327,12 @@ class CoCGameEngine {
                         </div>
                         <div class="members-subtext">
                             ${t.members && Array.isArray(t.members) ? t.members.map(m => m.name).join(' • ') : ''}
+                        </div>
+                        <div class="score-breakdown-tags">
+                            <span class="breakdown-pill">⛓️ Rantai: ${t.scores ? t.scores.chains : 0}</span>
+                            <span class="breakdown-pill">🎯 Konsep: ${t.scores ? t.scores.matching : 0}</span>
+                            <span class="breakdown-pill">⚡ Kripto: ${t.scores ? t.scores.cryptarithm : 0}</span>
+                            <span class="breakdown-pill collab">🤝 Kolaborasi: ${t.scores ? t.scores.collaboration : 0}</span>
                         </div>
                     </div>
                     <div class="progress-cell">
