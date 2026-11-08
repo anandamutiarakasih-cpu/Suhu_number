@@ -215,6 +215,7 @@ export async function renderRegisterView(container, { sessionCode, onRegistered,
     submitBtn.innerHTML = '<span>Menyimpan ke Ruang Kelas...</span>';
 
     try {
+      if (unsubscribe) unsubscribe();
       await firebaseService.joinSession(sessionCode, selectedNumber, teamName, members);
       toast.success(`Kelompok ${selectedNumber} berhasil terdaftar!`);
       audio.playCorrect();
@@ -227,4 +228,46 @@ export async function renderRegisterView(container, { sessionCode, onRegistered,
       toast.error(err.message || 'Gagal mendaftar ke sesi.');
     }
   });
+
+  // Realtime Team Claim Listener
+  const unsubscribe = firebaseService.listenToSession(sessionCode, (s) => {
+    if (!s || !s.teams) return;
+    const teams = s.teams;
+    grid.querySelectorAll('.tc-team-num-btn').forEach((btn) => {
+      const n = parseInt(btn.dataset.team, 10);
+      const isClaimed = teams[`team_${n}`] && teams[`team_${n}`].claimed;
+      const statusSpan = btn.querySelector('.tc-num-status');
+      if (isClaimed) {
+        btn.classList.add('claimed');
+        btn.disabled = true;
+        btn.title = 'Kelompok ini sudah diambil HP lain';
+        if (statusSpan) statusSpan.textContent = 'Terisi';
+        if (selectedNumber === n) {
+          btn.classList.remove('selected');
+          for (let k = 1; k <= 8; k++) {
+            if (!teams[`team_${k}`] || !teams[`team_${k}`].claimed) {
+              selectedNumber = k;
+              const nextBtn = grid.querySelector(`[data-team="${k}"]`);
+              if (nextBtn) nextBtn.classList.add('selected');
+              if (/^Kelompok\s\d+$/i.test(inputTeamName.value)) {
+                inputTeamName.value = `Kelompok ${selectedNumber}`;
+              }
+              break;
+            }
+          }
+        }
+      } else {
+        btn.classList.remove('claimed');
+        btn.disabled = false;
+        btn.title = '';
+        if (statusSpan) statusSpan.textContent = 'Tersedia';
+      }
+    });
+  });
+
+  return {
+    destroy: () => {
+      if (unsubscribe) unsubscribe();
+    }
+  };
 }

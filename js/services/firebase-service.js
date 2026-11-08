@@ -340,6 +340,64 @@ class FirebaseService {
   }
 
   /**
+   * LEAVE SESSION & RELEASE TEAM SLOT (CALLED BY STUDENT OR TEACHER)
+   */
+  async leaveSession(sessionCode, teamNumber) {
+    const num = parseInt(teamNumber, 10);
+    if (isNaN(num) || num < 1 || num > 8) {
+      return { success: false, error: 'Nomor kelompok tidak valid.' };
+    }
+
+    let session = await this.getSession(sessionCode);
+    if (!session) {
+      this.clearStoredTeamSession();
+      return { success: false, error: 'Sesi tidak ditemukan.' };
+    }
+
+    const resetTeam = {
+      number: num,
+      name: `Kelompok ${num}`,
+      members: [],
+      claimed: false,
+      ready: false,
+      joinedAt: null,
+      scores: {
+        game1: 0,
+        game2: 0,
+        game3: 0,
+        total: 0
+      },
+      progress: {
+        game1Submitted: false,
+        game2Submitted: false,
+        game3Submitted: false
+      },
+      predicate: 'Temperature Rookie'
+    };
+
+    if (!session.teams) session.teams = {};
+    session.teams[`team_${num}`] = resetTeam;
+
+    this.sessionsCache.set(sessionCode, session);
+
+    // Non-blocking background sync to Firebase RTDB
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
+      try {
+        const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${num}`);
+        const p = this.fbSet(teamRef, resetTeam);
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (e) {
+        console.warn('Firebase leaveSession sync error:', e);
+      }
+    }
+
+    this.notifySessionUpdate(sessionCode, session);
+    this.clearStoredTeamSession();
+
+    return { success: true, teamNumber: num };
+  }
+
+  /**
    * SET SESSION PHASE (ADMIN CONTROL)
    */
   async setSessionPhase(sessionCode, phase) {

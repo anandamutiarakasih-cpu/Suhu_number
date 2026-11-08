@@ -26,6 +26,39 @@
     grid-template-columns: 1fr;
   }
 
+  .tc-my-team-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .tc-my-team-actions {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 0.85rem;
+    margin-top: 0.25rem;
+  }
+
+  .tc-waiting-cancel-box {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .tc-cancel-hint {
+    justify-content: center;
+  }
+
+  .tc-cancel-link-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.5rem;
+  }
+
   .tc-team-selector {
     grid-template-columns: repeat(4, 1fr);
     gap: 0.5rem;

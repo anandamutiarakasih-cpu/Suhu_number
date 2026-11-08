@@ -5,12 +5,22 @@
 
 import { firebaseService } from '../services/firebase-service.js';
 import { audio } from '../services/audio-service.js';
+import { showLabModal } from '../components/modal.js';
+import { toast } from '../components/notification.js';
 
-export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseChange }) {
+export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseChange, onCancel }) {
   let unsubscribe = null;
 
   container.innerHTML = `
     <div class="tc-view tc-waiting-view">
+      <!-- Top Action Bar -->
+      <div class="tc-top-bar" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <button id="btn-cancel-waiting-top" class="tc-btn tc-btn-ghost danger" type="button" title="Keluar dan ganti kelompok">
+          ← Batalkan & Ganti Kelompok
+        </button>
+        <div class="tc-session-tag">KODE SESI: <strong>${sessionCode}</strong></div>
+      </div>
+
       <!-- Top Status Banner -->
       <header class="tc-waiting-header">
         <div class="tc-badge-lab">
@@ -18,7 +28,6 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
           LOBI PERSIAPAN • SINKRONISASI KELAS AKTIF
         </div>
         <h2 class="tc-waiting-title">Ruang Tunggu Kelompok</h2>
-        <div class="tc-session-tag">KODE SESI: <strong>${sessionCode}</strong></div>
       </header>
 
       <!-- Active Team Profile Box -->
@@ -29,7 +38,12 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
           <h3 class="tc-my-team-name" id="my-team-name-display">Memuat nama...</h3>
           <div class="tc-my-team-members" id="my-team-members-display"></div>
         </div>
-        <div class="tc-team-status-badge ready">SIAP BERTANDING</div>
+        <div class="tc-my-team-actions">
+          <div class="tc-team-status-badge ready">SIAP BERTANDING</div>
+          <button id="btn-cancel-waiting-card" class="tc-btn-cancel-waiting" type="button" title="Batalkan status siap kelompok ini">
+            <span>✕ Batalkan</span>
+          </button>
+        </div>
       </div>
 
       <!-- Sync Status Notice -->
@@ -39,6 +53,17 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
           <strong>Menunggu Instruksi Guru / Admin...</strong>
           <span>Tetap berada di halaman ini. Layar HP kelompok akan otomatis beralih saat guru memulai babak permainan!</span>
         </div>
+      </div>
+
+      <!-- Quick Cancel Action Box -->
+      <div class="tc-waiting-cancel-box">
+        <div class="tc-cancel-hint">
+          <span style="color: #f87171; font-weight: 700; margin-right: 4px;">⚠️ Perlu perubahan?</span>
+          <span>Salah memilih nomor kelompok atau salah memasukkan nama & absen siswa?</span>
+        </div>
+        <button id="btn-cancel-waiting-link" class="tc-cancel-link-btn" type="button">
+          ✕ Batalkan & Ganti Kelompok
+        </button>
       </div>
 
       <!-- 8 Teams Grid Status -->
@@ -58,6 +83,50 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
       </div>
     </div>
   `;
+
+  // Handle Cancel Action
+  const handleCancelClick = () => {
+    audio.playClick();
+    showLabModal({
+      title: 'BATALKAN PENDAFTARAN?',
+      contentHtml: `
+        <div style="font-size: 0.95rem; color: #f1f5f9; line-height: 1.6;">
+          <p style="margin-bottom: 0.8rem;">
+            Yakin ingin membatalkan status siap bertanding untuk <strong>Kelompok ${teamNumber}</strong>?
+          </p>
+          <div style="background: rgba(239, 68, 68, 0.12); border-left: 3px solid #ef4444; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.85rem; color: #fca5a5;">
+            Slot <strong>Kelompok ${teamNumber}</strong> akan dilepaskan sehingga Anda atau kelompok lain dapat memilih nomor kelompok ini kembali.
+          </div>
+        </div>
+      `,
+      confirmText: 'Ya, Batalkan',
+      cancelText: 'Tetap Menunggu',
+      onConfirm: async () => {
+        try {
+          if (unsubscribe) {
+            unsubscribe();
+            unsubscribe = null;
+          }
+          toast.info('Melepaskan slot kelompok...');
+          await firebaseService.leaveSession(sessionCode, teamNumber);
+          toast.success(`Pendaftaran Kelompok ${teamNumber} dibatalkan.`);
+          if (onCancel) {
+            onCancel();
+          }
+        } catch (err) {
+          toast.error('Gagal membatalkan: ' + (err.message || 'Terjadi kesalahan'));
+        }
+      }
+    });
+  };
+
+  const btnCancelTop = container.querySelector('#btn-cancel-waiting-top');
+  const btnCancelCard = container.querySelector('#btn-cancel-waiting-card');
+  const btnCancelLink = container.querySelector('#btn-cancel-waiting-link');
+
+  if (btnCancelTop) btnCancelTop.addEventListener('click', handleCancelClick);
+  if (btnCancelCard) btnCancelCard.addEventListener('click', handleCancelClick);
+  if (btnCancelLink) btnCancelLink.addEventListener('click', handleCancelClick);
 
   // Realtime Session Listener
   unsubscribe = firebaseService.listenToSession(sessionCode, (session) => {

@@ -137,6 +137,10 @@ class ChampionsOfCalorApp {
           teamNumber: this.state.teamNumber,
           onPhaseChange: (newPhase) => {
             this.routeByPhase(newPhase);
+          },
+          onCancel: () => {
+            this.state.teamNumber = null;
+            this.navigate('register', { sessionCode: this.state.sessionCode });
           }
         });
         break;

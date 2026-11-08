@@ -94,7 +94,12 @@ export function renderAdminView(container, { onExit }) {
               <div class="tc-card tc-admin-team-card" id="admin-team-card-${n}">
                 <div class="tc-atc-top">
                   <div class="tc-atc-num">KELOMPOK ${n}</div>
-                  <span class="tc-atc-badge offline" id="atc-badge-${n}">Belum Masuk</span>
+                  <div class="tc-atc-status-wrap" style="display: flex; align-items: center; gap: 0.4rem;">
+                    <span class="tc-atc-badge offline" id="atc-badge-${n}">Belum Masuk</span>
+                    <button type="button" class="tc-btn-reset-slot hidden" id="atc-reset-${n}" data-team="${n}" title="Keluarkan & kosongkan slot Kelompok ${n}">
+                      ✕ Reset
+                    </button>
+                  </div>
                 </div>
                 <h4 class="tc-atc-name" id="atc-name-${n}">-</h4>
                 <div class="tc-atc-members" id="atc-members-${n}">-</div>
@@ -273,6 +278,26 @@ export function renderAdminView(container, { onExit }) {
     }
   });
 
+  // Handle Teacher Reset / Kick Single Team Slot
+  const teamsGrid = container.querySelector('#admin-teams-grid');
+  if (teamsGrid) {
+    teamsGrid.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.tc-btn-reset-slot');
+      if (!btn) return;
+      const teamNum = parseInt(btn.dataset.team, 10);
+      if (!teamNum || !activeSessionCode) return;
+      audio.playClick();
+      if (confirm(`Keluarkan dan kosongkan slot Kelompok ${teamNum}? Perangkat siswa akan dibatalkan pendaftarannya.`)) {
+        try {
+          await firebaseService.leaveSession(activeSessionCode, teamNum);
+          toast.info(`Slot Kelompok ${teamNum} berhasil dikosongkan.`);
+        } catch (err) {
+          toast.error('Gagal mereset slot: ' + err.message);
+        }
+      }
+    });
+  }
+
   function attachSessionListener(code) {
     if (unsubscribe) unsubscribe();
 
@@ -301,11 +326,13 @@ export function renderAdminView(container, { onExit }) {
         const g3El = card.querySelector(`#atc-g3-${i}`);
         const totEl = card.querySelector(`#atc-total-${i}`);
         const predEl = card.querySelector(`#atc-pred-${i}`);
+        const resetBtn = card.querySelector(`#atc-reset-${i}`);
 
         if (team && team.claimed) {
           card.classList.add('active-team');
           badgeEl.className = 'tc-atc-badge online';
           badgeEl.textContent = 'Terkoneksi';
+          if (resetBtn) resetBtn.classList.remove('hidden');
 
           nameEl.textContent = team.name || `Kelompok ${i}`;
           const mList = (team.members || []).map((m) => `${m.name} (${m.absen})`).join(', ');
@@ -325,6 +352,7 @@ export function renderAdminView(container, { onExit }) {
           card.classList.remove('active-team');
           badgeEl.className = 'tc-atc-badge offline';
           badgeEl.textContent = 'Belum Masuk';
+          if (resetBtn) resetBtn.classList.add('hidden');
           nameEl.textContent = '-';
           memEl.textContent = '-';
           g1El.textContent = '0';
