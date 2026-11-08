@@ -1,17 +1,17 @@
 /**
  * Firebase Realtime Database Live Classroom Sync
- * Otomatis terhubung ke: https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app/
+ * Mendukung 2 Role: Guru (Admin Proyektor) & Siswa (1 HP per Kelompok)
+ * Database: https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app/
  */
 
 class FirebaseLiveSync {
     constructor() {
         this.databaseURL = "https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app";
         this.projectId = "suhunumber";
-        this.roomCode = "COC-7A"; // Default room code yang mudah diucapkan di kelas
+        this.roomCode = "COC-7A";
         this.app = null;
         this.db = null;
         this.isConnected = false;
-        this.isBroadcasting = false;
         this.currentRoomRef = null;
     }
 
@@ -47,24 +47,14 @@ class FirebaseLiveSync {
             const connectedRef = this.db.ref(".info/connected");
             connectedRef.on("value", (snap) => {
                 this.isConnected = (snap.val() === true);
-                this.updateUIStatus();
+                if (window.engine) {
+                    window.engine.updateLiveConnectionUI(this.isConnected);
+                }
             });
 
-            // Langsung dengarkan room aktif
             this.listenToRoom(this.roomCode);
         } catch (err) {
             console.error('Firebase auto-connect error:', err);
-        }
-    }
-
-    updateUIStatus() {
-        // Update badge siswa & guru
-        const codeDisplays = document.querySelectorAll('.active-room-display');
-        codeDisplays.forEach(el => el.textContent = this.roomCode);
-
-        const statusDot = document.getElementById('liveStatusDot');
-        if (statusDot) {
-            statusDot.className = `live-dot ${this.isConnected ? 'online' : 'offline'}`;
         }
     }
 
@@ -76,7 +66,6 @@ class FirebaseLiveSync {
         } catch (e) {}
 
         this.listenToRoom(this.roomCode);
-        this.updateUIStatus();
     }
 
     listenToRoom(roomCode) {
@@ -90,9 +79,9 @@ class FirebaseLiveSync {
         this.currentRoomRef = this.db.ref(`coc_rooms/${this.roomCode}`);
         this.currentRoomRef.on('value', (snapshot) => {
             const data = snapshot.val();
-            if (data && data.teams && !this.isBroadcasting) {
+            if (data && data.teams) {
                 if (window.engine) {
-                    window.engine.syncFromFirebase(data.teams);
+                    window.engine.syncTeamsFromCloud(data.teams, data.phase);
                 }
             }
         }, (err) => {
@@ -100,23 +89,38 @@ class FirebaseLiveSync {
         });
     }
 
-    broadcastTeams(teams) {
+    // Siswa mendaftarkan kelompoknya ke Room guru
+    registerTeamOnCloud(team) {
+        if (!this.db || !team || !team.id) return;
+        const teamRef = this.db.ref(`coc_rooms/${this.roomCode}/teams/${team.id}`);
+        teamRef.set({
+            ...team,
+            lastUpdated: Date.now()
+        }).catch(err => console.warn('Gagal register tim ke cloud:', err));
+    }
+
+    // Siswa memperbarui skor kelompok setelah menjawab
+    updateTeamScoreOnCloud(teamId, scores, totalScore, currentProgress) {
+        if (!this.db || !teamId) return;
+        const teamRef = this.db.ref(`coc_rooms/${this.roomCode}/teams/${teamId}`);
+        teamRef.update({
+            scores: scores,
+            totalScore: totalScore,
+            currentProgress: currentProgress || "Bermain",
+            lastUpdated: Date.now()
+        }).catch(err => console.warn('Gagal update skor ke cloud:', err));
+    }
+
+    // Guru mengontrol fase game secara global (opsional)
+    broadcastGamePhase(phase) {
         if (!this.db) return;
-        this.isBroadcasting = true;
+        this.db.ref(`coc_rooms/${this.roomCode}/phase`).set(phase).catch(() => {});
+    }
 
-        const payload = {
-            roomCode: this.roomCode,
-            updatedAt: Date.now(),
-            teams: teams
-        };
-
-        this.db.ref(`coc_rooms/${this.roomCode}`).set(payload)
-            .then(() => {
-                this.isBroadcasting = false;
-            })
-            .catch(() => {
-                this.isBroadcasting = false;
-            });
+    // Guru mereset sesi room
+    resetRoomOnCloud() {
+        if (!this.db) return;
+        this.db.ref(`coc_rooms/${this.roomCode}/teams`).remove().catch(() => {});
     }
 
     generateRandomCode() {

@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CHAMPIONS OF CALOR: Clash of Science – IPA SMP Kelas VII</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,42 +19,28 @@
     <!-- Confetti Canvas -->
     <canvas id="confettiCanvas"></canvas>
 
-    <!-- Top Navigation & Status Bar -->
+    <!-- Top Navigation & Role Switcher Bar -->
     <header class="app-topbar">
         <div class="topbar-branding">
             <span class="brand-badge">CoC SCIENCE</span>
             <span class="brand-title">CHAMPIONS OF CALOR</span>
         </div>
 
-        <div class="topbar-center-status">
-            <div class="active-team-chip" id="topActiveTeam">
-                <span class="active-team-indicator" style="background:#f59e0b"></span>
-                <span class="active-team-name">Tim Joule</span>
-            </div>
-            <div class="score-chip" id="topTeamScore">0 Poin</div>
-            <div class="timer-chip" title="Waktu Tantangan">
-                <span>⏱</span>
-                <span id="gameTimerDisplay">00:00</span>
-            </div>
-        </div>
-
-        <!-- Student Room Entry Area -->
-        <div class="student-room-bar">
-            <span class="student-label">🔑 Siswa Masuk:</span>
-            <div class="student-input-wrap">
-                <input type="text" id="studentRoomInput" placeholder="Kode Guru..." maxlength="10">
-                <button class="btn-student-join" onclick="engine.joinStudentRoom()">Gabung</button>
-            </div>
-            <span class="student-active-badge" id="studentActiveRoomBadge">
-                🟢 Room: <strong class="active-room-display">COC-7A</strong>
-            </span>
+        <!-- Role Switcher (Guru vs Siswa) -->
+        <div class="role-toggle-group">
+            <button class="btn-role-tab" id="btnRoleGuru" onclick="engine.setRole('guru')">
+                👨‍🏫 <span>Guru (Proyektor)</span>
+            </button>
+            <button class="btn-role-tab active" id="btnRoleSiswa" onclick="engine.setRole('siswa')">
+                📱 <span>Siswa (HP Kelompok)</span>
+            </button>
         </div>
 
         <div class="topbar-actions">
-            <!-- Dedicated Teacher Button on the Top Right -->
-            <button class="btn-teacher-panel" onclick="engine.openTeacherPanel()" title="Klik untuk Buka Panel Guru & Salin Kode Sesi">
-                👨‍🏫 <strong>Guru</strong> <span class="teacher-code-pill active-room-display">COC-7A</span>
-            </button>
+            <span class="student-active-badge" style="background:rgba(255,255,255,0.06); padding:4px 10px; border-radius:999px;">
+                <span class="live-dot online" id="liveStatusDot"></span>
+                <span>Room: <strong class="active-room-display" style="color:var(--gold-light);">COC-7A</strong></span>
+            </span>
             <button class="btn-icon-action" id="btnToggleScratchpad" title="Buka Cakar-Cakar Digital">
                 ✏️ <span>Kertas Cakar</span>
             </button>
@@ -70,130 +56,242 @@
         </div>
     </header>
 
-    <!-- Multi-Team Selector Bar (Visible if > 1 team) -->
-    <nav class="multi-team-bar hidden" id="multiTeamBar"></nav>
-
     <!-- Main Screens Container -->
     <main class="app-main">
 
         <!-- =========================================================
-             SCREEN 1: LOBBY & SETUP ARENA
+             SCREEN 1: LOBBY (BERDASARKAN PERAN GURU ATAU SISWA)
         ========================================================= -->
         <section class="app-screen" id="screenLobby">
-            <div class="hero-section">
-                <div class="hero-tag">⚡ TANTANGAN AKADEMIK SAINS COV ⚡</div>
-                <h1 class="hero-title">
-                    CLASH OF <span class="glow-gold">CHAMPIONS</span> : <span class="glow-cyan">EDISI KALOR</span>
-                </h1>
-                <p class="hero-subtitle">
-                    Kompetisi sains kolaboratif materi <strong>Kalor & Perubahannya</strong> untuk siswa SMP Kelas VII. 
-                    Satukan pemikiran, pecahkan teka-teki, dan raih gelar Juara Laboratorium!
-                </p>
+            
+            <!-- -----------------------------------------------------
+                 TAMPILAN KHUSUS GURU (ADMIN & PROYEKTOR KELAS)
+            ----------------------------------------------------- -->
+            <div id="viewGuru" class="hidden">
+                <!-- Jumbo Banner Kode Room untuk Proyektor -->
+                <div class="guru-projector-banner">
+                    <span class="guru-banner-tag">PAPAN KONTROL GURU (LAYAR PROYEKTOR KELAS)</span>
+                    <h2 class="guru-banner-title">Minta Siswa Membuka Web di HP Kelompok & Masukkan Kode:</h2>
+                    <div class="guru-banner-code active-room-display">COC-7A</div>
+                    <div class="guru-banner-actions">
+                        <button class="btn-game-action primary" onclick="engine.copyTeacherCodeOnly()">
+                            📋 Salin Kode Guru
+                        </button>
+                        <button class="btn-game-action secondary" onclick="engine.copyTeacherFullLink()">
+                            🔗 Salin Link Lengkap Siswa
+                        </button>
+                        <button class="btn-game-action secondary" onclick="engine.teacherGenerateNewCode()">
+                            🔄 Buat Kode Baru
+                        </button>
+                        <button class="btn-game-action secondary" onclick="engine.showFinalPodium()">
+                            🏆 Tampilkan Podium Juara
+                        </button>
+                        <button class="btn-game-action secondary" style="color:var(--red-wrong);" onclick="engine.teacherResetSession()">
+                            🗑 Reset Sesi Kelas
+                        </button>
+                    </div>
+                </div>
 
-                <!-- 4 Collaboration Pillars Banner -->
-                <div class="collab-pillars-grid">
+                <!-- Live Leaderboard Proyektor (Realtime) -->
+                <div class="live-leaderboard-card">
+                    <div class="leaderboard-header-bar">
+                        <h3 style="font-size:1.3rem; font-weight:800; color:#fff; display:flex; align-items:center; gap:10px;">
+                            <span>📡 Klasemen Live Antarkelompok (Realtime Firebase)</span>
+                        </h3>
+                        <small style="color:var(--cyan-light);">Data otomatis diperbarui saat siswa menjawab di HP</small>
+                    </div>
+                    <div id="teacherLiveLeaderboardTable">
+                        <!-- Diinjeksi otomatis oleh JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Preview Permainan untuk Guru -->
+                <div class="arena-card">
+                    <div class="arena-card-header">
+                        <h3 class="arena-card-title">🎮 Preview Soal Tantangan (Untuk Guru)</h3>
+                    </div>
+                    <p style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:16px;">
+                        Guru dapat mendemokan jenis tantangan kalor berikut di layar proyektor jika diperlukan:
+                    </p>
+                    <div class="game-modes-grid">
+                        <div class="game-mode-card">
+                            <span class="game-letter-badge">GAME A</span>
+                            <h4 class="game-mode-title">NUMBER CHAINS</h4>
+                            <p class="game-mode-desc">Rantai Peristiwa Kalor (5 Tahapan Urutan Fisika).</p>
+                            <button class="btn-start-game" onclick="engine.startNumberChains()">Demo Game A ▶</button>
+                        </div>
+                        <div class="game-mode-card">
+                            <span class="game-letter-badge">GAME B</span>
+                            <h4 class="game-mode-title">START CHAMP</h4>
+                            <p class="game-mode-desc">Mencocokkan Konsep Kalor Sehari-hari (12 Kasus Ilustrasi).</p>
+                            <button class="btn-start-game" onclick="engine.startStartChamp()">Demo Game B ▶</button>
+                        </div>
+                        <div class="game-mode-card">
+                            <span class="game-letter-badge">GAME C</span>
+                            <h4 class="game-mode-title">CRYPTARITHM WAR</h4>
+                            <p class="game-mode-desc">Teka-Teki Angka Kalor & Asas Black (6 Level Logika).</p>
+                            <button class="btn-start-game" onclick="engine.startCryptarithm()">Demo Game C ▶</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- -----------------------------------------------------
+                 TAMPILAN KHUSUS SISWA (GAWAI HP KELOMPOK: 1 HP / 3-4 SISWA)
+            ----------------------------------------------------- -->
+            <div id="viewSiswa">
+                <!-- Status Bar Kelompok Siswa di HP -->
+                <div class="student-status-sticky-bar">
+                    <div>
+                        <div class="student-team-badge-title">
+                            <span>👥</span>
+                            <span id="studentHeaderTeamName">Tim Joule</span>
+                        </div>
+                        <div class="student-rank-badge" id="studentHeaderRank">
+                            Peringkat <strong>#1</strong> di Kelas
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); display:block;">Skor Tim Kamu</span>
+                        <div class="student-score-highlight" id="studentHeaderScore">0 Poin</div>
+                    </div>
+                </div>
+
+                <!-- Card Gabung Room Guru & Pengaturan Anggota Kelompok -->
+                <div class="student-setup-card">
+                    <h3 style="font-size:1.15rem; font-weight:800; color:var(--gold-light); margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+                        <span>📱</span> Pendaftaran Kelompok di HP Ini (3–4 Siswa)
+                    </h3>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:16px;">
+                        Gunakan 1 HP untuk satu kelompok. Diskusikan setiap jawaban bersama-sama!
+                    </p>
+
+                    <!-- Kode Room dari Guru -->
+                    <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:12px; margin-bottom:16px;">
+                        <label style="font-size:0.8rem; font-weight:700; color:var(--cyan-light); display:block; margin-bottom:6px;">
+                            🔑 Kode Room dari Guru di Proyektor:
+                        </label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="studentRoomInputLobby" class="fb-input-text" style="flex:1; text-transform:uppercase; font-size:1.1rem; font-weight:800;" value="COC-7A" placeholder="Contoh: COC-7A">
+                            <button class="btn-game-action primary" onclick="engine.joinStudentRoomByCode()">Hubungkan</button>
+                        </div>
+                    </div>
+
+                    <!-- Nama Kelompok -->
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">
+                            Nama Kelompok:
+                        </label>
+                        <input type="text" id="studentTeamNameInput" class="fb-input-text" style="width:100%; font-weight:700;" value="Tim Joule" placeholder="Contoh: Tim Newton / Tim Joule">
+                    </div>
+
+                    <!-- Anggota & Peran (4 Pilar Kolaborasi) -->
+                    <label style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:8px;">
+                        Nama Anggota & Peran Kolaborasi:
+                    </label>
+                    <div id="studentMembersSetupList">
+                        <!-- Injected by JavaScript -->
+                    </div>
+
+                    <div style="text-align:right; margin-top:14px;">
+                        <button class="btn-game-action success" style="width:100%; justify-content:center;" onclick="engine.saveStudentTeamDetails()">
+                            🚀 Simpan Data Tim & Siap Bertanding
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4 Pilar Kolaborasi Reminder -->
+                <div class="collab-pillars-grid" style="margin-bottom:24px;">
                     <div class="pillar-card">
                         <div class="pillar-icon">🤝</div>
                         <h4 class="pillar-title">1. Works Productively</h4>
-                        <p class="pillar-desc">Setiap anggota berkontribusi aktif mengemukakan ide dan membagi tugas.</p>
+                        <p class="pillar-desc">Semua anggota aktif berdiskusi di HP kelompok.</p>
                     </div>
                     <div class="pillar-card">
                         <div class="pillar-icon">👂</div>
                         <h4 class="pillar-title">2. Demonstrates Respect</h4>
-                        <p class="pillar-desc">Saling mendengarkan, menghargai pendapat, dan tidak memotong penjelasan rekan.</p>
+                        <p class="pillar-desc">Saling mendengarkan ide rekan sekelompok.</p>
                     </div>
                     <div class="pillar-card">
                         <div class="pillar-icon">⚖️</div>
                         <h4 class="pillar-title">3. Compromises</h4>
-                        <p class="pillar-desc">Berdiskusi secara terbuka dan mencapai mufakat saat ada perbedaan jawaban.</p>
+                        <p class="pillar-desc">Sepakati pilihan jawaban bersama-sama.</p>
                     </div>
                     <div class="pillar-card">
                         <div class="pillar-icon">🛡️</div>
                         <h4 class="pillar-title">4. Shared Responsibility</h4>
-                        <p class="pillar-desc">Seluruh anggota bertanggung jawab bersama terhadap keputusan dan skor tim.</p>
+                        <p class="pillar-desc">Bertanggung jawab bersama atas skor tim.</p>
                     </div>
                 </div>
-            </div>
 
-            <!-- Team Setup Section -->
-            <div class="arena-card">
-                <div class="arena-card-header">
-                    <h3 class="arena-card-title">
-                        👥 Pendaftaran Kelompok & Pembagian Peran (3–4 Siswa)
-                    </h3>
-                    <button class="btn-icon-action" onclick="engine.addTeam()">+ Tambah Tim Lawan</button>
+                <!-- Pilihan 3 Permainan untuk Siswa -->
+                <h3 style="font-size:1.25rem; font-weight:800; color:#fff; margin-bottom:14px;">
+                    🎯 Pilih Tantangan Sains Kalor:
+                </h3>
+                <div class="game-modes-grid">
+                    <!-- Mode A -->
+                    <div class="game-mode-card">
+                        <div class="game-mode-header">
+                            <span class="game-letter-badge">PERMAINAN A</span>
+                            <span class="game-icon-visual">⛓️</span>
+                        </div>
+                        <h3 class="game-mode-title">NUMBER CHAINS</h3>
+                        <div class="game-mode-subtitle">Rantai Peristiwa Kalor</div>
+                        <p class="game-mode-desc">
+                            Susun kartu peristiwa fisika (es melebur, angin laut, termos, keping bimetal) ke urutan yang benar!
+                        </p>
+                        <div class="game-mode-meta">
+                            <span>🎯 5 Tahapan</span> • <span>⏱️ 100 Poin / Soal</span>
+                        </div>
+                        <button class="btn-start-game" onclick="engine.startNumberChains()">
+                            Mulai Game A ▶
+                        </button>
+                    </div>
+
+                    <!-- Mode B -->
+                    <div class="game-mode-card">
+                        <div class="game-mode-header">
+                            <span class="game-letter-badge">PERMAINAN B</span>
+                            <span class="game-icon-visual">🎯</span>
+                        </div>
+                        <h3 class="game-mode-title">START CHAMP</h3>
+                        <div class="game-mode-subtitle">Tantangan Mencocokkan Konsep</div>
+                        <p class="game-mode-desc">
+                            Cocokkan 12 gambar ilustrasi fenomena sehari-hari dengan konsep perpindahan & perubahan kalor yang tepat!
+                        </p>
+                        <div class="game-mode-meta">
+                            <span>🎯 12 Ilustrasi</span> • <span>⏱️ 100 Poin / Ronde</span>
+                        </div>
+                        <button class="btn-start-game" onclick="engine.startStartChamp()">
+                            Mulai Game B ▶
+                        </button>
+                    </div>
+
+                    <!-- Mode C -->
+                    <div class="game-mode-card">
+                        <div class="game-mode-header">
+                            <span class="game-letter-badge">PERMAINAN C</span>
+                            <span class="game-icon-visual">⚡</span>
+                        </div>
+                        <h3 class="game-mode-title">CRYPTARITHM WAR</h3>
+                        <div class="game-mode-subtitle">Teka-Teki Angka Kalor</div>
+                        <p class="game-mode-desc">
+                            Pecahkan teka-teki logika hitung rumus kalor (Q = m × c × ΔT & Asas Black) dengan tombol angka di HP!
+                        </p>
+                        <div class="game-mode-meta">
+                            <span>🎯 6 Soal Logika</span> • <span>⏱️ 150 Poin / Soal</span>
+                        </div>
+                        <button class="btn-start-game" onclick="engine.startCryptarithm()">
+                            Mulai Game C ▶
+                        </button>
+                    </div>
                 </div>
 
-                <div class="team-setup-grid" id="teamSetupList">
-                    <!-- Injected by JavaScript -->
-                </div>
-            </div>
-
-            <!-- Game Selection Cards -->
-            <div class="game-modes-grid">
-                <!-- Mode A -->
-                <div class="game-mode-card">
-                    <div class="game-mode-header">
-                        <span class="game-letter-badge">PERMAINAN A</span>
-                        <span class="game-icon-visual">⛓️</span>
-                    </div>
-                    <h3 class="game-mode-title">NUMBER CHAINS</h3>
-                    <div class="game-mode-subtitle">Rantai Peristiwa Kalor</div>
-                    <p class="game-mode-desc">
-                        Latih ketelitian urutan peristiwa sains! Susun kartu proses pemanasan, perubahan wujud, dan perpindahan kalor menjadi rantai kronologis yang utuh dan logis.
-                    </p>
-                    <div class="game-mode-meta">
-                        <span>🎯 5 Tahapan Rantai</span> • <span>⏱️ 100 Poin / Tantangan</span>
-                    </div>
-                    <button class="btn-start-game" onclick="engine.startNumberChains()">
-                        Mulai Number Chains ▶
+                <div style="text-align: center; margin-top: 24px; margin-bottom: 24px;">
+                    <button class="btn-game-action secondary" onclick="engine.showFinalPodium()">
+                        🏆 Lihat Klasemen Akhir & Podium Juara
                     </button>
                 </div>
-
-                <!-- Mode B -->
-                <div class="game-mode-card">
-                    <div class="game-mode-header">
-                        <span class="game-letter-badge">PERMAINAN B</span>
-                        <span class="game-icon-visual">🎯</span>
-                    </div>
-                    <h3 class="game-mode-title">START CHAMP</h3>
-                    <div class="game-mode-subtitle">Tantangan Mencocokkan Konsep</div>
-                    <p class="game-mode-desc">
-                        Identifikasi fenomena sehari-hari! Pasangkan ilustrasi gambar sains (konduksi, konveksi, radiasi, penyerapan & pelepasan kalor) dengan konsep fisika yang tepat.
-                    </p>
-                    <div class="game-mode-meta">
-                        <span>🎯 12 Ilustrasi Kasus</span> • <span>⏱️ 100 Poin / Ronde</span>
-                    </div>
-                    <button class="btn-start-game" onclick="engine.startStartChamp()">
-                        Mulai Start Champ ▶
-                    </button>
-                </div>
-
-                <!-- Mode C -->
-                <div class="game-mode-card">
-                    <div class="game-mode-header">
-                        <span class="game-letter-badge">PERMAINAN C</span>
-                        <span class="game-icon-visual">⚡</span>
-                    </div>
-                    <h3 class="game-mode-title">CRYPTARITHM WAR</h3>
-                    <div class="game-mode-subtitle">Teka-Teki Angka Kalor</div>
-                    <p class="game-mode-desc">
-                        Tantangan puncak ala Clash of Champions! Temukan angka dan digit misterius yang hilang berdasarkan persamaan matematis kalor (Q = m × c × ΔT & Asas Black).
-                    </p>
-                    <div class="game-mode-meta">
-                        <span>🎯 6 Soal Teka-Teki Logika</span> • <span>⏱️ 150 Poin / Soal</span>
-                    </div>
-                    <button class="btn-start-game" onclick="engine.startCryptarithm()">
-                        Mulai Cryptarithm War ▶
-                    </button>
-                </div>
-            </div>
-
-            <!-- View Final Podium Button -->
-            <div style="text-align: center; margin-bottom: 30px;">
-                <button class="btn-game-action secondary" onclick="engine.showFinalPodium()">
-                    🏆 Lihat Klasemen & Podium Juara
-                </button>
             </div>
         </section>
 
@@ -224,7 +322,7 @@
 
             <!-- Collaboration Protocol Banner -->
             <div class="collab-status-banner" id="collabStatusBanner">
-                <span>⏳ <strong>Konsensus Tim:</strong> Diskusikan urutan bersama seluruh anggota tim sebelum menekan periksa!</span>
+                <span>⏳ <strong>Konsensus Tim:</strong> Diskusikan urutan bersama seluruh anggota tim di HP ini!</span>
                 <button class="btn-open-collab" onclick="engine.openCollaborationModal()">🤝 Kunci Kesepakatan Tim (+25 pt)</button>
             </div>
 
@@ -279,7 +377,7 @@
                 </div>
                 <h2 class="game-stage-title">START CHAMP : ARENA PENCOCOKAN KONSEP</h2>
                 <p class="game-stage-story">
-                    Pilih kartu peristiwa di kolom kiri, lalu pilih konsep fisika kalor yang paling sesuai di kolom kanan. 
+                    Pilih kartu peristiwa di sebelah kiri, lalu pilih konsep fisika kalor yang paling sesuai di sebelah kanan. 
                     Diskusikan secara matang bersama anggota kelompok!
                 </p>
             </div>
@@ -300,7 +398,7 @@
                 <!-- Right: Concept Targets -->
                 <div class="match-concepts-column">
                     <h3 class="concepts-column-title">🎯 Bank Konsep Sains</h3>
-                    <p class="concepts-column-subtitle">Klik salah satu konsep di bawah untuk memasangkannya dengan kartu yang dipilih:</p>
+                    <p class="concepts-column-subtitle">Klik salah satu konsep di bawah untuk memasangkannya:</p>
                     <div class="concepts-btn-grid" id="matchConceptsContainer">
                         <!-- Injected by JavaScript -->
                     </div>
@@ -384,7 +482,7 @@
                     <div class="numpad-card">
                         <div class="numpad-header">
                             <span>Papan Angka Digital</span>
-                            <small>Klik atau ketik via keyboard</small>
+                            <small>Klik tombol angka di HP</small>
                         </div>
                         <div class="numpad-grid">
                             <button class="btn-numpad" onclick="engine.numpadInput('1')">1</button>
@@ -513,7 +611,7 @@
                 <button class="modal-close-btn" onclick="document.getElementById('collabModal').classList.add('hidden')">✕</button>
             </div>
             <div class="modal-body">
-                <p>Kelompok <strong id="collabTeamName" style="color:var(--gold-light);"></strong>, pastikan empat aspek kolaborasi telah dipenuhi sebelum menetapkan jawaban:</p>
+                <p>Kelompok <strong id="collabTeamName" style="color:var(--gold-light);"></strong>, pastikan empat aspek kolaborasi telah dipenuhi sebelum menetapkan jawaban di HP:</p>
                 
                 <div class="collab-rules-box">
                     <div class="collab-rule-item">
@@ -576,60 +674,6 @@
             <div>
                 <button class="btn-game-action primary" id="btnCompleteDone">
                     Lanjut ke Klasemen / Menu Utama ➔
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 5. Teacher Live Room Modal (Tampilan Khusus Guru) -->
-    <div class="modal-overlay hidden" id="teacherModal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3 class="modal-title">👨‍🏫 Panel Guru (Sesi Kelas Live)</h3>
-                <button class="modal-close-btn" onclick="engine.closeTeacherPanel()">✕</button>
-            </div>
-            <div class="modal-body">
-                <p style="font-size:0.92rem; color:var(--text-secondary); margin-bottom:12px;">
-                    Tampilkan kode ini di depan kelas atau proyektor agar seluruh kelompok siswa dapat bergabung ke sesi kompetisi Anda:
-                </p>
-
-                <!-- Big Room Code Display for Projector -->
-                <div class="teacher-code-jumbo-box">
-                    <span class="jumbo-label">KODE ROOM KELAS</span>
-                    <div class="jumbo-code" id="teacherBigRoomCode">COC-7A</div>
-                    <div class="jumbo-buttons">
-                        <button class="btn-game-action primary" onclick="engine.copyTeacherCodeOnly()">
-                            📋 Salin Kode Guru
-                        </button>
-                        <button class="btn-game-action secondary" onclick="engine.teacherGenerateNewCode()">
-                            🔄 Buat Kode Baru
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Shareable link for students -->
-                <div class="fb-form-group" style="margin-top:16px;">
-                    <label class="fb-form-label">Tautan Otomatis Siswa (Siswa Langsung Masuk Room):</label>
-                    <div class="share-link-group">
-                        <input type="text" class="fb-input-text" id="teacherShareUrl" readonly>
-                        <button class="btn-game-action secondary" onclick="engine.copyTeacherFullLink()">📋 Salin Link</button>
-                    </div>
-                </div>
-
-                <!-- Live teams monitor on projector -->
-                <div style="margin-top:20px;">
-                    <h4 style="font-size:0.9rem; color:var(--gold-light); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                        <span>📡 Skor Kelompok Siswa Terhubung:</span>
-                        <span id="liveStatusDot" class="live-dot online" title="Status Database Online"></span>
-                    </h4>
-                    <div class="teacher-live-monitor-list" id="teacherLiveMonitorList">
-                        <!-- Injected by JavaScript -->
-                    </div>
-                </div>
-            </div>
-            <div style="text-align:right; margin-top:20px;">
-                <button class="btn-game-action primary" onclick="engine.closeTeacherPanel()">
-                    Tutup & Lanjutkan Game 👍
                 </button>
             </div>
         </div>

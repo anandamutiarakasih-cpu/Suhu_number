@@ -1,42 +1,47 @@
 /**
  * Clash of Champions - Kalor Game Engine
- * Mengelola state permainan, multi-tim, sistem poin, alur permainan, dan sinkronisasi Firebase Live
+ * Mendukung 2 Peran Utama:
+ * 1. GURU (Admin Proyektor): Membuka kode room, mengawasi leaderboard live seluruh kelompok.
+ * 2. SISWA (1 HP per Kelompok 3-4 Orang): Memasukkan kode room, mendaftarkan nama tim, dan memainkan Game A, B, C.
+ * Terhubung langsung ke Firebase Realtime Database.
  */
 
 class CoCGameEngine {
     constructor() {
-        this.teams = [
-            {
-                id: 1,
-                name: "Tim Joule",
-                color: "#f59e0b",
-                members: [
-                    { name: "Siswa 1", role: "spokesperson" },
-                    { name: "Siswa 2", role: "concept" },
-                    { name: "Siswa 3", role: "math" },
-                    { name: "Siswa 4", role: "verifier" }
-                ],
-                scores: {
-                    chains: 0,
-                    matching: 0,
-                    cryptarithm: 0,
-                    collaboration: 0
-                },
-                totalScore: 0
-            }
-        ];
-        this.currentTeamIndex = 0;
+        // Role state: 'guru' atau 'siswa'
+        this.currentRole = 'siswa';
+
+        // Data kelompok siswa di HP ini
+        this.myStudentTeam = this.loadStoredStudentTeam() || {
+            id: "team_" + Date.now().toString(36) + "_" + Math.floor(Math.random() * 1000),
+            name: "Tim Joule",
+            color: "#f59e0b",
+            members: [
+                { name: "Siswa 1", role: "spokesperson" },
+                { name: "Siswa 2", role: "concept" },
+                { name: "Siswa 3", role: "math" },
+                { name: "Siswa 4", role: "verifier" }
+            ],
+            scores: { chains: 0, matching: 0, cryptarithm: 0, collaboration: 0 },
+            totalScore: 0,
+            currentProgress: "Lobby"
+        };
+
+        // Seluruh tim dalam room (didapat dari Firebase untuk Guru & Ranking Siswa)
+        this.allRoomTeams = [];
+
+        // Game play state
         this.activeGame = null; // 'chains', 'matching', 'cryptarithm'
-        
+
         // Game A state (Number Chains)
         this.chainIndex = 0;
         this.currentChainItems = [];
         this.draggedItemIndex = null;
 
         // Game B state (Start Champ)
-        this.matchRound = 0; // 0, 1, 2 (4 items per round = 12 items)
+        this.matchRound = 0; // 0, 1, 2
         this.selectedScenarioId = null;
-        this.currentPairings = {}; // scenarioId -> concept string
+        this.currentPairings = {};
 
         // Game C state (Cryptarithm)
         this.cryptoIndex = 0;
@@ -50,109 +55,359 @@ class CoCGameEngine {
         this.collabAgreed = false;
     }
 
-    init() {
-        this.checkUrlRoomCode();
-        this.setupEventListeners();
-        this.updateTeamsUI();
-        this.renderLobby();
-
-        // Inisialisasi Firebase Live Sync
-        if (window.firebaseSync) {
-            window.firebaseSync.init();
-        }
+    loadStoredStudentTeam() {
+        try {
+            const saved = localStorage.getItem('coc_student_team');
+            if (saved) return JSON.parse(saved);
+        } catch (e) {}
+        return null;
     }
 
-    checkUrlRoomCode() {
+    saveStudentTeam() {
         try {
-            const params = new URLSearchParams(window.location.search);
-            const room = params.get('room');
-            if (room && window.firebaseSync) {
-                window.firebaseSync.roomCode = room.toUpperCase();
-            }
+            localStorage.setItem('coc_student_team', JSON.stringify(this.myStudentTeam));
         } catch (e) {}
     }
 
-    getCurrentTeam() {
-        return this.teams[this.currentTeamIndex] || this.teams[0];
-    }
+    init() {
+        this.detectInitialRole();
+        this.setupEventListeners();
+        this.renderRoleUI();
+        this.renderStudentSetupForm();
 
-    addTeam(name = "") {
-        if (this.teams.length >= 4) return;
-        const colors = ["#f59e0b", "#06b6d4", "#a855f7", "#10b981"];
-        const defaultNames = ["Tim Joule", "Tim Kelvin", "Tim Celsius", "Tim Newton"];
-        const newIndex = this.teams.length;
-        this.teams.push({
-            id: newIndex + 1,
-            name: name || defaultNames[newIndex] || `Tim ${newIndex + 1}`,
-            color: colors[newIndex % colors.length],
-            members: [
-                { name: `Anggota 1`, role: "spokesperson" },
-                { name: `Anggota 2`, role: "concept" },
-                { name: `Anggota 3`, role: "math" },
-                { name: `Anggota 4`, role: "verifier" }
-            ],
-            scores: { chains: 0, matching: 0, cryptarithm: 0, collaboration: 0 },
-            totalScore: 0
-        });
-        this.updateTeamsUI();
-        this.broadcastLive();
-    }
-
-    removeTeam(index) {
-        if (this.teams.length <= 1) return;
-        this.teams.splice(index, 1);
-        if (this.currentTeamIndex >= this.teams.length) {
-            this.currentTeamIndex = 0;
+        // Inisialisasi koneksi Firebase
+        if (window.firebaseSync) {
+            window.firebaseSync.init();
         }
-        this.updateTeamsUI();
-        this.broadcastLive();
+
+        // Tampilkan layar awal
+        this.showScreen('screenLobby');
     }
 
-    updateTeamsUI() {
-        const teamContainer = document.getElementById('teamSetupList');
-        if (!teamContainer) return;
+    detectInitialRole() {
+        const params = new URLSearchParams(window.location.search);
+        const roleParam = params.get('role');
+        if (roleParam === 'guru' || roleParam === 'admin') {
+            this.currentRole = 'guru';
+        } else if (roleParam === 'siswa') {
+            this.currentRole = 'siswa';
+        } else {
+            // Jika layar lebar (> 992px) dan bukan HP, tawarkan default atau cek localStorage
+            const savedRole = localStorage.getItem('coc_user_role');
+            if (savedRole) {
+                this.currentRole = savedRole;
+            } else if (window.innerWidth >= 992) {
+                this.currentRole = 'guru'; // Laptop default guru
+            } else {
+                this.currentRole = 'siswa'; // HP default siswa
+            }
+        }
+    }
 
-        teamContainer.innerHTML = '';
-        this.teams.forEach((team, tIdx) => {
-            const teamCard = document.createElement('div');
-            teamCard.className = 'team-setup-card';
-            teamCard.style.borderColor = team.color;
-            teamCard.innerHTML = `
-                <div class="team-card-header">
-                    <div class="team-title-wrap">
-                        <span class="team-color-dot" style="background:${team.color}"></span>
-                        <input type="text" class="team-name-input" value="${team.name}" data-team="${tIdx}" placeholder="Nama Kelompok">
-                    </div>
-                    ${this.teams.length > 1 ? `<button class="btn-remove-team" onclick="engine.removeTeam(${tIdx})" title="Hapus Tim">✕</button>` : ''}
-                </div>
-                <div class="team-members-grid">
-                    ${team.members.map((m, mIdx) => `
-                        <div class="member-input-row">
-                            <span class="role-badge ${m.role}">
-                                ${this.getRoleIcon(m.role)} ${this.getRoleLabel(m.role)}
-                            </span>
-                            <input type="text" class="member-name-input" 
-                                value="${m.name}" 
-                                placeholder="Nama Siswa ${mIdx+1}"
-                                onchange="engine.updateMemberName(${tIdx}, ${mIdx}, this.value)">
-                        </div>
-                    `).join('')}
+    setRole(role) {
+        if (role !== 'guru' && role !== 'siswa') return;
+        this.currentRole = role;
+        try {
+            localStorage.setItem('coc_user_role', role);
+        } catch (e) {}
+
+        window.soundFx.playClick();
+        this.renderRoleUI();
+
+        if (this.currentRole === 'guru') {
+            this.showToast("👨‍🏫 Beralih ke Tampilan Guru (Layar Proyektor)");
+            this.renderTeacherLiveMonitor();
+        } else {
+            this.showToast("📱 Beralih ke Tampilan Siswa (Gawai HP)");
+            this.updateStudentHeader();
+        }
+    }
+
+    renderRoleUI() {
+        const btnRoleGuru = document.getElementById('btnRoleGuru');
+        const btnRoleSiswa = document.getElementById('btnRoleSiswa');
+        const viewGuru = document.getElementById('viewGuru');
+        const viewSiswa = document.getElementById('viewSiswa');
+
+        if (this.currentRole === 'guru') {
+            if (btnRoleGuru) btnRoleGuru.classList.add('active');
+            if (btnRoleSiswa) btnRoleSiswa.classList.remove('active');
+            if (viewGuru) viewGuru.classList.remove('hidden');
+            if (viewSiswa) viewSiswa.classList.add('hidden');
+        } else {
+            if (btnRoleGuru) btnRoleGuru.classList.remove('active');
+            if (btnRoleSiswa) btnRoleSiswa.classList.add('active');
+            if (viewGuru) viewGuru.classList.add('hidden');
+            if (viewSiswa) viewSiswa.classList.remove('hidden');
+        }
+
+        // Update Room Code Displays
+        const roomCode = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
+        document.querySelectorAll('.active-room-display').forEach(el => el.textContent = roomCode);
+
+        this.updateStudentHeader();
+        this.renderTeacherLiveMonitor();
+    }
+
+    updateLiveConnectionUI(isConnected) {
+        const dot = document.getElementById('liveStatusDot');
+        if (dot) {
+            dot.className = `live-dot ${isConnected ? 'online' : 'offline'}`;
+        }
+        const roomCode = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
+        document.querySelectorAll('.active-room-display').forEach(el => el.textContent = roomCode);
+    }
+
+    // ----------------------------------------------------
+    // ROLE SISWA: REGISTRASI & KONTROL TIM HP
+    // ----------------------------------------------------
+    renderStudentSetupForm() {
+        const team = this.myStudentTeam;
+        const nameInput = document.getElementById('studentTeamNameInput');
+        if (nameInput) nameInput.value = team.name;
+
+        const membersContainer = document.getElementById('studentMembersSetupList');
+        if (!membersContainer) return;
+
+        membersContainer.innerHTML = team.members.map((m, idx) => `
+            <div class="student-member-row">
+                <span class="role-badge ${m.role}">
+                    ${this.getRoleIcon(m.role)} ${this.getRoleLabel(m.role)}
+                </span>
+                <input type="text" class="member-name-input" 
+                    value="${m.name}" 
+                    placeholder="Nama Siswa ${idx + 1}"
+                    onchange="engine.updateStudentMemberName(${idx}, this.value)">
+            </div>
+        `).join('');
+
+        this.updateStudentHeader();
+    }
+
+    updateStudentMemberName(idx, val) {
+        if (this.myStudentTeam.members[idx]) {
+            this.myStudentTeam.members[idx].name = val.trim() || `Siswa ${idx + 1}`;
+            this.saveStudentTeam();
+            this.broadcastMyStudentTeam();
+        }
+    }
+
+    saveStudentTeamDetails() {
+        const nameInput = document.getElementById('studentTeamNameInput');
+        if (nameInput && nameInput.value.trim()) {
+            this.myStudentTeam.name = nameInput.value.trim();
+        }
+
+        const roomInput = document.getElementById('studentRoomInputLobby');
+        if (roomInput && roomInput.value.trim()) {
+            const code = roomInput.value.trim().toUpperCase();
+            if (window.firebaseSync) {
+                window.firebaseSync.setRoom(code);
+            }
+        }
+
+        this.saveStudentTeam();
+        this.broadcastMyStudentTeam();
+        window.soundFx.playCorrect();
+        this.showToast(`✅ Tim "${this.myStudentTeam.name}" siap bertanding!`);
+        this.updateStudentHeader();
+    }
+
+    joinStudentRoomByCode() {
+        const input = document.getElementById('studentRoomInputTop') || document.getElementById('studentRoomInputLobby');
+        if (!input) return;
+        const code = input.value.trim().toUpperCase();
+        if (!code) {
+            this.showToast("Masukkan kode dari guru terlebih dahulu!");
+            window.soundFx.playWrong();
+            return;
+        }
+
+        if (window.firebaseSync) {
+            window.firebaseSync.setRoom(code);
+            this.broadcastMyStudentTeam();
+            window.soundFx.playCorrect();
+            this.showToast(`🎉 Berhasil bergabung ke Room: ${code}`);
+            this.renderRoleUI();
+        }
+    }
+
+    broadcastMyStudentTeam() {
+        if (window.firebaseSync) {
+            window.firebaseSync.registerTeamOnCloud(this.myStudentTeam);
+        }
+    }
+
+    updateStudentHeader() {
+        const teamNameEl = document.getElementById('studentHeaderTeamName');
+        if (teamNameEl) teamNameEl.textContent = this.myStudentTeam.name;
+
+        const scoreEl = document.getElementById('studentHeaderScore');
+        if (scoreEl) scoreEl.textContent = `${this.myStudentTeam.totalScore} Poin`;
+
+        // Hitung peringkat tim ini di antara semua tim di kelas
+        const rankEl = document.getElementById('studentHeaderRank');
+        if (rankEl) {
+            const myRank = this.getMyTeamRank();
+            const totalTeams = Math.max(this.allRoomTeams.length, 1);
+            rankEl.innerHTML = `Peringkat <strong>#${myRank}</strong> dari ${totalTeams} Kelompok`;
+        }
+    }
+
+    getMyTeamRank() {
+        if (!this.allRoomTeams || this.allRoomTeams.length === 0) return 1;
+        const sorted = [...this.allRoomTeams].sort((a, b) => b.totalScore - a.totalScore);
+        const idx = sorted.findIndex(t => t.id === this.myStudentTeam.id);
+        return idx !== -1 ? idx + 1 : 1;
+    }
+
+    // ----------------------------------------------------
+    // ROLE GURU: MONITOR LIVE LEADERBOARD PROYEKTOR
+    // ----------------------------------------------------
+    renderTeacherLiveMonitor() {
+        const container = document.getElementById('teacherLiveLeaderboardTable');
+        if (!container) return;
+
+        const roomCode = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
+        document.querySelectorAll('.active-room-display').forEach(el => el.textContent = roomCode);
+
+        if (this.allRoomTeams.length === 0) {
+            container.innerHTML = `
+                <div class="empty-teams-notice">
+                    <div style="font-size:2.2rem; margin-bottom:8px;">⏳</div>
+                    <h4>Belum Ada Kelompok Siswa yang Bergabung</h4>
+                    <p>Minta siswa membuka web di HP masing-masing dan memasukkan kode room: <strong style="color:var(--gold-light); font-size:1.1rem;">${roomCode}</strong></p>
                 </div>
             `;
-            teamContainer.appendChild(teamCard);
-        });
+            return;
+        }
 
-        // Add event listeners to team name inputs
-        document.querySelectorAll('.team-name-input').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const idx = parseInt(e.target.dataset.team);
-                this.teams[idx].name = e.target.value.trim() || `Tim ${idx+1}`;
-                this.updateScoreboards();
-                this.broadcastLive();
-            });
-        });
+        const sorted = [...this.allRoomTeams].sort((a, b) => b.totalScore - a.totalScore);
+        const medals = ['🥇', '🥈', '🥉', '⭐'];
 
-        this.updateScoreboards();
+        container.innerHTML = `
+            <div class="leaderboard-table-header">
+                <span>Peringkat</span>
+                <span>Nama Kelompok & Anggota</span>
+                <span>Progres Game</span>
+                <span>Skor Total</span>
+            </div>
+            ${sorted.map((t, idx) => `
+                <div class="leaderboard-table-row ${idx === 0 ? 'rank-gold' : ''}">
+                    <div class="rank-badge-cell">
+                        <span class="medal-icon">${medals[idx] || '⭐'}</span>
+                        <strong>#${idx + 1}</strong>
+                    </div>
+                    <div class="team-info-cell">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="team-color-dot" style="background:${t.color || '#f59e0b'}"></span>
+                            <strong style="font-size:1.1rem; color:#fff;">${t.name}</strong>
+                        </div>
+                        <div class="members-subtext">
+                            ${t.members && Array.isArray(t.members) ? t.members.map(m => m.name).join(' • ') : ''}
+                        </div>
+                    </div>
+                    <div class="progress-cell">
+                        <span class="progress-tag">${t.currentProgress || 'Bermain'}</span>
+                    </div>
+                    <div class="score-cell">
+                        <strong class="score-num">${t.totalScore || 0}</strong>
+                        <small>pt</small>
+                    </div>
+                </div>
+            `).join('')}
+        `;
+    }
+
+    teacherGenerateNewCode() {
+        window.soundFx.playClick();
+        if (!window.firebaseSync) return;
+        const newCode = window.firebaseSync.generateRandomCode();
+        window.firebaseSync.setRoom(newCode);
+        this.allRoomTeams = [];
+        this.renderRoleUI();
+        this.showToast(`✨ Kode Room baru dibuat: ${newCode}`);
+    }
+
+    teacherResetSession() {
+        if (!confirm("Apakah Anda yakin ingin mereset seluruh data kelompok untuk sesi kelas ini?")) return;
+        window.soundFx.playClick();
+        if (window.firebaseSync) {
+            window.firebaseSync.resetRoomOnCloud();
+        }
+        this.allRoomTeams = [];
+        this.renderTeacherLiveMonitor();
+        this.showToast("🔄 Sesi kelas telah dibersihkan.");
+    }
+
+    copyTeacherCodeOnly() {
+        const code = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
+        navigator.clipboard.writeText(code).then(() => {
+            window.soundFx.playCorrect();
+            this.showToast(`📋 Kode "${code}" berhasil disalin!`);
+        }).catch(() => {
+            this.showToast(`Kode room: ${code}`);
+        });
+    }
+
+    copyTeacherFullLink() {
+        const code = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
+        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${code}&role=siswa`;
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            window.soundFx.playCorrect();
+            this.showToast("📋 Link Room siswa berhasil disalin ke clipboard!");
+        }).catch(() => {
+            this.showToast(`Link siswa: ${shareUrl}`);
+        });
+    }
+
+    // Sinkronisasi data tim dari Firebase
+    syncTeamsFromCloud(teamsObj) {
+        if (!teamsObj) {
+            this.allRoomTeams = [];
+            this.renderTeacherLiveMonitor();
+            return;
+        }
+
+        this.allRoomTeams = Object.values(teamsObj);
+        this.renderTeacherLiveMonitor();
+        this.updateStudentHeader();
+
+        // Indikasi denyut data masuk
+        const dot = document.getElementById('liveStatusDot');
+        if (dot) {
+            dot.classList.add('pulse');
+            setTimeout(() => dot.classList.remove('pulse'), 600);
+        }
+    }
+
+    // ----------------------------------------------------
+    // SISTEM POIN KELOMPOK SISWA
+    // ----------------------------------------------------
+    addPoints(category, points, progressName) {
+        this.myStudentTeam.scores[category] += points;
+        this.myStudentTeam.totalScore = 
+            this.myStudentTeam.scores.chains + 
+            this.myStudentTeam.scores.matching + 
+            this.myStudentTeam.scores.cryptarithm + 
+            this.myStudentTeam.scores.collaboration;
+        
+        if (progressName) {
+            this.myStudentTeam.currentProgress = progressName;
+        }
+
+        this.saveStudentTeam();
+        this.updateStudentHeader();
+
+        // Sinkronisasi realtime ke Firebase
+        if (window.firebaseSync) {
+            window.firebaseSync.updateTeamScoreOnCloud(
+                this.myStudentTeam.id,
+                this.myStudentTeam.scores,
+                this.myStudentTeam.totalScore,
+                this.myStudentTeam.currentProgress
+            );
+        }
     }
 
     getRoleIcon(role) {
@@ -173,85 +428,6 @@ class CoCGameEngine {
             case 'verifier': return 'Verifikator';
             default: return 'Anggota';
         }
-    }
-
-    updateMemberName(teamIdx, memberIdx, name) {
-        if (this.teams[teamIdx] && this.teams[teamIdx].members[memberIdx]) {
-            this.teams[teamIdx].members[memberIdx].name = name.trim() || `Siswa ${memberIdx+1}`;
-            this.broadcastLive();
-        }
-    }
-
-    updateScoreboards() {
-        // Update top bar team info
-        const curTeam = this.getCurrentTeam();
-        const curTeamEl = document.getElementById('topActiveTeam');
-        if (curTeamEl && curTeam) {
-            curTeamEl.innerHTML = `
-                <span class="active-team-indicator" style="background:${curTeam.color}"></span>
-                <span class="active-team-name">${curTeam.name}</span>
-            `;
-        }
-
-        const scoreEl = document.getElementById('topTeamScore');
-        if (scoreEl && curTeam) {
-            scoreEl.textContent = `${curTeam.totalScore} Poin`;
-        }
-
-        // Update multi-team tab if multiple teams
-        const multiTeamBar = document.getElementById('multiTeamBar');
-        if (multiTeamBar) {
-            if (this.teams.length > 1) {
-                multiTeamBar.classList.remove('hidden');
-                multiTeamBar.innerHTML = this.teams.map((t, idx) => `
-                    <button class="team-tab-btn ${idx === this.currentTeamIndex ? 'active' : ''}" 
-                        style="border-color:${t.color}" 
-                        onclick="engine.switchTeam(${idx})">
-                        <span class="tab-dot" style="background:${t.color}"></span>
-                        <span>${t.name}</span>
-                        <strong class="tab-score">${t.totalScore} pt</strong>
-                    </button>
-                `).join('');
-            } else {
-                multiTeamBar.classList.add('hidden');
-            }
-        }
-    }
-
-    switchTeam(index) {
-        if (index >= 0 && index < this.teams.length) {
-            this.currentTeamIndex = index;
-            window.soundFx.playClick();
-            this.updateScoreboards();
-            if (this.activeGame === 'chains') this.renderChainStage();
-            if (this.activeGame === 'matching') this.renderMatchRound();
-            if (this.activeGame === 'cryptarithm') this.renderCryptoStage();
-        }
-    }
-
-    addPoints(category, points) {
-        const team = this.getCurrentTeam();
-        if (!team) return;
-        team.scores[category] += points;
-        team.totalScore = team.scores.chains + team.scores.matching + team.scores.cryptarithm + team.scores.collaboration;
-        this.updateScoreboards();
-        this.broadcastLive();
-    }
-
-    broadcastLive() {
-        if (window.firebaseSync && window.firebaseSync.isConnected) {
-            window.firebaseSync.broadcastTeams(this.teams);
-        }
-    }
-
-    syncFromFirebase(remoteTeams) {
-        if (!remoteTeams || !Array.isArray(remoteTeams)) return;
-        this.teams = remoteTeams;
-        this.updateScoreboards();
-        if (this.activeGame === null) {
-            this.updateTeamsUI();
-        }
-        this.showToast("⚡ Skor sinkron live via Firebase!");
     }
 
     startTimer() {
@@ -277,7 +453,6 @@ class CoCGameEngine {
         }
     }
 
-    // Screen Navigation
     showScreen(screenId) {
         document.querySelectorAll('.app-screen').forEach(s => s.classList.add('hidden'));
         const target = document.getElementById(screenId);
@@ -291,7 +466,7 @@ class CoCGameEngine {
         this.activeGame = null;
         this.stopTimer();
         this.showScreen('screenLobby');
-        this.updateScoreboards();
+        this.renderRoleUI();
     }
 
     // ----------------------------------------------------
@@ -304,12 +479,13 @@ class CoCGameEngine {
         window.soundFx.playStart();
         this.startTimer();
         this.renderChainStage();
+        this.broadcastMyStudentTeam();
     }
 
     renderChainStage() {
         const data = NUMBER_CHAINS_DATA[this.chainIndex];
         if (!data) {
-            this.showGameCompleteModal("Game A: Number Chains Selesai!", "Selamat! Tim berhasil menyelesaikan seluruh rantai peristiwa kalor dengan sangat baik.", () => {
+            this.showGameCompleteModal("Game A: Number Chains Selesai!", "Selamat! Tim berhasil menyelesaikan seluruh rantai peristiwa kalor.", () => {
                 this.renderLobby();
             });
             return;
@@ -325,7 +501,6 @@ class CoCGameEngine {
         document.getElementById('chainTopic').textContent = `Topik: ${data.topic}`;
         document.getElementById('chainStory').textContent = data.story;
 
-        // Shuffle cards
         this.currentChainItems = [...data.correctOrder];
         this.shuffleArray(this.currentChainItems);
         if (this.isChainCorrect() && this.currentChainItems.length > 2) {
@@ -339,6 +514,9 @@ class CoCGameEngine {
         document.getElementById('chainFeedback').innerHTML = '';
         document.getElementById('btnNextChain').classList.add('hidden');
         document.getElementById('btnCheckChain').classList.remove('hidden');
+
+        // Update progress status di Firebase
+        this.addPoints('chains', 0, `Game A (Rantai ${this.chainIndex + 1}/5)`);
     }
 
     renderChainCards() {
@@ -360,7 +538,6 @@ class CoCGameEngine {
                 </div>
             `;
 
-            // Drag and drop listeners
             card.addEventListener('dragstart', (e) => {
                 this.draggedItemIndex = idx;
                 card.classList.add('dragging');
@@ -435,10 +612,10 @@ class CoCGameEngine {
 
         if (matchedCount === correctOrder.length) {
             window.soundFx.playCorrect();
-            this.addPoints('chains', 100);
-            
-            if (this.collabAgreed) {
-                this.addPoints('collaboration', 25);
+            const bonusCollab = this.collabAgreed ? 25 : 0;
+            this.addPoints('chains', 100, `Game A (Rantai ${this.chainIndex + 1} Selesai)`);
+            if (bonusCollab > 0) {
+                this.addPoints('collaboration', bonusCollab);
             }
 
             feedbackEl.innerHTML = `
@@ -446,7 +623,7 @@ class CoCGameEngine {
                     <div class="fb-icon">🎉</div>
                     <div class="fb-text">
                         <h4>URUTAN SEMPURNA! (+100 Poin ${this.collabAgreed ? '+ 25 Bonus Kolaborasi' : ''})</h4>
-                        <p>Kelompok berhasil menata seluruh tahapan kalor dengan sangat presisi!</p>
+                        <p>Kelompok berhasil menata seluruh tahapan kalor dengan presisi!</p>
                     </div>
                 </div>
             `;
@@ -469,7 +646,7 @@ class CoCGameEngine {
                     <div class="fb-icon">⚠️</div>
                     <div class="fb-text">
                         <h4>Urutan Belum Tepat (${matchedCount}/${correctOrder.length} Benar)</h4>
-                        <p>Perhatikan kartu bertanda merah. Diskusikan kembali bersama anggota kelompok untuk memperbaiki urutannya!</p>
+                        <p>Perhatikan kartu bertanda merah. Diskusikan kembali bersama anggota kelompok!</p>
                     </div>
                 </div>
             `;
@@ -482,7 +659,7 @@ class CoCGameEngine {
         if (this.chainIndex < NUMBER_CHAINS_DATA.length) {
             this.renderChainStage();
         } else {
-            this.showGameCompleteModal("🏆 Selesai Game A: Number Chains!", "Luar biasa! Rantai peristiwa kalor berhasil dituntaskan.", () => {
+            this.showGameCompleteModal("🏆 Selesai Game A: Number Chains!", "Luar biasa! Seluruh rantai peristiwa kalor berhasil dituntaskan.", () => {
                 this.renderLobby();
             });
         }
@@ -504,6 +681,7 @@ class CoCGameEngine {
         window.soundFx.playStart();
         this.startTimer();
         this.renderMatchRound();
+        this.broadcastMyStudentTeam();
     }
 
     renderMatchRound() {
@@ -596,6 +774,7 @@ class CoCGameEngine {
         });
 
         this.updateConceptButtonsState();
+        this.addPoints('matching', 0, `Game B (Ronde ${this.matchRound + 1}/3)`);
     }
 
     unpairMatch(scenarioId) {
@@ -663,7 +842,7 @@ class CoCGameEngine {
 
         if (correctCount === roundItems.length) {
             window.soundFx.playCorrect();
-            this.addPoints('matching', 100);
+            this.addPoints('matching', 100, `Game B (Ronde ${this.matchRound + 1} Selesai)`);
             if (this.collabAgreed) this.addPoints('collaboration', 25);
 
             feedbackEl.innerHTML = `
@@ -689,7 +868,7 @@ class CoCGameEngine {
                     <div class="fb-icon">⚠️</div>
                     <div class="fb-text">
                         <h4>${correctCount} dari ${roundItems.length} Pasangan Tepat</h4>
-                        <p>Periksa kembali kartu yang bertanda merah. Diskusikan konsep perpindahan kalor yang paling relevan!</p>
+                        <p>Periksa kembali kartu yang bertanda merah. Diskusikan konsep perpindahan kalor yang relevan!</p>
                     </div>
                 </div>
             `;
@@ -721,7 +900,7 @@ class CoCGameEngine {
             </li>
         `).join('');
 
-        document.getElementById('modalExpFact').innerHTML = "<em>Kunci Sains:</em> Perhatikan apakah terjadi perpindahan materi partikel (konveksi), getaran antarpartikel padat (konduksi), atau pancaran gelombang (radiasi)!";
+        document.getElementById('modalExpFact').innerHTML = "<em>Kunci Sains:</em> Perhatikan apakah terjadi perpindahan materi partikel (konveksi), getaran partikel padat (konduksi), atau pancaran gelombang (radiasi)!";
         modal.classList.remove('hidden');
     }
 
@@ -735,8 +914,8 @@ class CoCGameEngine {
         window.soundFx.playStart();
         this.startTimer();
         this.renderCryptoStage();
+        this.broadcastMyStudentTeam();
 
-        // Initialize scratchpad canvas
         setTimeout(() => {
             const canvas = document.getElementById('scratchpadCanvas');
             if (canvas && window.scratchpad) {
@@ -762,7 +941,6 @@ class CoCGameEngine {
         document.getElementById('cryptoFormula').textContent = `Rumus: ${data.formula}`;
         document.getElementById('cryptoStory').textContent = data.story;
 
-        // Givens
         const givensEl = document.getElementById('cryptoGivensList');
         givensEl.innerHTML = data.givens.map(g => `
             <div class="given-pill">
@@ -771,10 +949,8 @@ class CoCGameEngine {
             </div>
         `).join('');
 
-        // Math Puzzle Box
         document.getElementById('cryptoEquationDisplay').innerHTML = `<code>${data.puzzleDisplay}</code>`;
 
-        // Input slots
         const inputsContainer = document.getElementById('cryptoInputsContainer');
         inputsContainer.innerHTML = '';
         data.inputs.forEach((inp, idx) => {
@@ -808,6 +984,8 @@ class CoCGameEngine {
         document.getElementById('cryptoFeedback').innerHTML = '';
         document.getElementById('btnNextCrypto').classList.add('hidden');
         document.getElementById('btnCheckCrypto').classList.remove('hidden');
+
+        this.addPoints('cryptarithm', 0, `Game C (Soal ${this.cryptoIndex + 1}/6)`);
     }
 
     numpadInput(char) {
@@ -866,7 +1044,7 @@ class CoCGameEngine {
 
         if (allCorrect) {
             window.soundFx.playCorrect();
-            this.addPoints('cryptarithm', 150);
+            this.addPoints('cryptarithm', 150, `Game C (Soal ${this.cryptoIndex + 1} Terpecahkan)`);
             if (this.collabAgreed) this.addPoints('collaboration', 25);
 
             feedbackEl.innerHTML = `
@@ -887,7 +1065,7 @@ class CoCGameEngine {
                     `Solusi: ${data.title}`,
                     data.keyConcept,
                     data.solutionSteps,
-                    "Kunci Sukses Hitung Kalor: Selalu pastikan satuan massa (kg), kalor jenis (J/kg°C), dan perubahan suhu (°C) sudah seragam!"
+                    "Kunci Sukses Hitung Kalor: Selalu pastikan satuan massa (kg), kalor jenis (J/kg°C), dan suhu (°C) sudah seragam!"
                 );
             }, 600);
         } else {
@@ -897,7 +1075,7 @@ class CoCGameEngine {
                     <div class="fb-icon">⚠️</div>
                     <div class="fb-text">
                         <h4>Angka Belum Tepat!</h4>
-                        <p>Gunakan Kertas Cakar Digital untuk menghitung ulang atau klik tombol Petunjuk untuk berdiskusi bersama tim.</p>
+                        <p>Gunakan Kertas Cakar Digital untuk menghitung ulang atau berdiskusi bersama anggota kelompok.</p>
                     </div>
                 </div>
             `;
@@ -923,13 +1101,12 @@ class CoCGameEngine {
     }
 
     // ----------------------------------------------------
-    // COLLABORATION PROTOCOL
+    // PROTOKOL KOLABORASI
     // ----------------------------------------------------
     openCollaborationModal() {
         window.soundFx.playClick();
         const modal = document.getElementById('collabModal');
-        const team = this.getCurrentTeam();
-        if (!team) return;
+        const team = this.myStudentTeam;
 
         document.getElementById('collabTeamName').textContent = team.name;
         document.getElementById('collabMembersList').innerHTML = team.members.map(m => `
@@ -965,114 +1142,6 @@ class CoCGameEngine {
             banner.innerHTML = `⏳ <strong>Konsensus Tim:</strong> Diskusikan jawaban bersama tim sebelum memeriksa!`;
             banner.classList.remove('agreed');
         }
-    }
-
-    // ----------------------------------------------------
-    // GURU & SISWA ROOM SYNC CONTROLS
-    // ----------------------------------------------------
-    joinStudentRoom() {
-        const input = document.getElementById('studentRoomInput');
-        if (!input) return;
-        const code = input.value.trim().toUpperCase();
-        if (!code) {
-            this.showToast("Masukkan kode dari guru terlebih dahulu!");
-            window.soundFx.playWrong();
-            return;
-        }
-
-        if (window.firebaseSync) {
-            window.firebaseSync.setRoom(code);
-            window.soundFx.playCorrect();
-            this.showToast(`🎉 Berhasil bergabung ke Room Kelas: ${code}`);
-            input.value = '';
-            
-            // Perbarui badge
-            const badge = document.getElementById('studentActiveRoomBadge');
-            if (badge) {
-                badge.innerHTML = `🟢 Terhubung: <strong style="color:var(--gold-light);">${code}</strong>`;
-            }
-        }
-    }
-
-    openTeacherPanel() {
-        window.soundFx.playClick();
-        const modal = document.getElementById('teacherModal');
-        if (!modal) return;
-
-        const currentCode = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
-        const codeDisplay = document.getElementById('teacherBigRoomCode');
-        if (codeDisplay) codeDisplay.textContent = currentCode;
-
-        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${currentCode}`;
-        const linkDisplay = document.getElementById('teacherShareUrl');
-        if (linkDisplay) linkDisplay.value = shareUrl;
-
-        // Render live teams monitor
-        this.renderTeacherLiveMonitor();
-
-        modal.classList.remove('hidden');
-    }
-
-    closeTeacherPanel() {
-        window.soundFx.playClick();
-        document.getElementById('teacherModal').classList.add('hidden');
-    }
-
-    teacherGenerateNewCode() {
-        window.soundFx.playClick();
-        if (!window.firebaseSync) return;
-
-        const newCode = window.firebaseSync.generateRandomCode();
-        window.firebaseSync.setRoom(newCode);
-
-        const codeDisplay = document.getElementById('teacherBigRoomCode');
-        if (codeDisplay) codeDisplay.textContent = newCode;
-
-        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${newCode}`;
-        const linkDisplay = document.getElementById('teacherShareUrl');
-        if (linkDisplay) linkDisplay.value = shareUrl;
-
-        this.showToast(`✨ Kode Room baru dibuat: ${newCode}`);
-    }
-
-    copyTeacherCodeOnly() {
-        const code = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
-        navigator.clipboard.writeText(code).then(() => {
-            window.soundFx.playCorrect();
-            this.showToast(`📋 Kode "${code}" berhasil disalin! Berikan ke siswa.`);
-        }).catch(() => {
-            this.showToast(`Kode room: ${code}`);
-        });
-    }
-
-    copyTeacherFullLink() {
-        const linkDisplay = document.getElementById('teacherShareUrl');
-        if (!linkDisplay) return;
-        linkDisplay.select();
-        navigator.clipboard.writeText(linkDisplay.value).then(() => {
-            window.soundFx.playCorrect();
-            this.showToast("📋 Link Room siswa berhasil disalin ke clipboard!");
-        }).catch(() => {
-            this.showToast("Salin teks link secara manual.");
-        });
-    }
-
-    renderTeacherLiveMonitor() {
-        const monitorContainer = document.getElementById('teacherLiveMonitorList');
-        if (!monitorContainer) return;
-
-        monitorContainer.innerHTML = this.teams.map((t, idx) => `
-            <div class="teacher-team-row">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span class="team-color-dot" style="background:${t.color}"></span>
-                    <strong>${t.name}</strong>
-                    <small style="color:var(--text-muted)">(${t.members.map(m => m.name).join(', ')})</small>
-                </div>
-                <div style="font-family:var(--font-mono); font-weight:800; color:var(--gold-light);">
-                    ${t.totalScore} pt
-                </div>
-            </div>
-        `).join('');
     }
 
     // ----------------------------------------------------
@@ -1146,7 +1215,9 @@ class CoCGameEngine {
         window.soundFx.playFanfare();
         this.triggerConfetti();
 
-        const sortedTeams = [...this.teams].sort((a, b) => b.totalScore - a.totalScore);
+        // Gunakan allRoomTeams jika ada, jika belum gunakan tim lokal
+        const teamsToSort = (this.allRoomTeams.length > 0) ? this.allRoomTeams : [this.myStudentTeam];
+        const sortedTeams = [...teamsToSort].sort((a, b) => b.totalScore - a.totalScore);
         const podiumContainer = document.getElementById('podiumRankings');
         
         podiumContainer.innerHTML = sortedTeams.map((team, rank) => {
@@ -1158,13 +1229,13 @@ class CoCGameEngine {
                     <h3 class="podium-team-name">${team.name}</h3>
                     <div class="podium-score-highlight">${team.totalScore} <span>Poin</span></div>
                     <div class="podium-score-breakdown">
-                        <div class="score-row"><span>Rantai Peristiwa:</span> <strong>${team.scores.chains} pt</strong></div>
-                        <div class="score-row"><span>Mencocokkan Konsep:</span> <strong>${team.scores.matching} pt</strong></div>
-                        <div class="score-row"><span>Kriptaritma Kalor:</span> <strong>${team.scores.cryptarithm} pt</strong></div>
-                        <div class="score-row"><span>Bonus Kolaborasi:</span> <strong>${team.scores.collaboration} pt</strong></div>
+                        <div class="score-row"><span>Rantai Peristiwa:</span> <strong>${team.scores ? team.scores.chains : 0} pt</strong></div>
+                        <div class="score-row"><span>Mencocokkan Konsep:</span> <strong>${team.scores ? team.scores.matching : 0} pt</strong></div>
+                        <div class="score-row"><span>Kriptaritma Kalor:</span> <strong>${team.scores ? team.scores.cryptarithm : 0} pt</strong></div>
+                        <div class="score-row"><span>Bonus Kolaborasi:</span> <strong>${team.scores ? team.scores.collaboration : 0} pt</strong></div>
                     </div>
                     <div class="podium-members">
-                        ${team.members.map(m => `<span>${this.getRoleIcon(m.role)} ${m.name}</span>`).join(' • ')}
+                        ${team.members && Array.isArray(team.members) ? team.members.map(m => `<span>${this.getRoleIcon(m.role)} ${m.name}</span>`).join(' • ') : ''}
                     </div>
                 </div>
             `;
@@ -1176,9 +1247,6 @@ class CoCGameEngine {
         window.print();
     }
 
-    // ----------------------------------------------------
-    // CONFETTI EFFECT
-    // ----------------------------------------------------
     triggerConfetti() {
         const canvas = document.getElementById('confettiCanvas');
         if (!canvas) return;
@@ -1231,9 +1299,6 @@ class CoCGameEngine {
         render();
     }
 
-    // ----------------------------------------------------
-    // UTILITIES
-    // ----------------------------------------------------
     shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -1243,7 +1308,6 @@ class CoCGameEngine {
     }
 
     setupEventListeners() {
-        // Fullscreen toggle
         const btnFullscreen = document.getElementById('btnToggleFullscreen');
         if (btnFullscreen) {
             btnFullscreen.addEventListener('click', () => {
@@ -1258,7 +1322,6 @@ class CoCGameEngine {
             });
         }
 
-        // Sound toggle
         const btnSound = document.getElementById('btnToggleSound');
         if (btnSound) {
             btnSound.addEventListener('click', () => {
@@ -1268,7 +1331,6 @@ class CoCGameEngine {
             });
         }
 
-        // Toggle scratchpad whiteboard
         const btnScratch = document.getElementById('btnToggleScratchpad');
         const scratchDrawer = document.getElementById('scratchpadDrawer');
         if (btnScratch && scratchDrawer) {
@@ -1291,7 +1353,6 @@ class CoCGameEngine {
     }
 }
 
-// Global Game Engine Instance
 window.engine = new CoCGameEngine();
 window.addEventListener('DOMContentLoaded', () => {
     window.engine.init();

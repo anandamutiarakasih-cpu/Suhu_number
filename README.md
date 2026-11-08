@@ -4,69 +4,60 @@ Terinspirasi dari atmosfer kompetisi akademik **Clash of Champions (CoC)**.
 
 ---
 
-## 🌟 Tentang Game
+## 🌟 Sistem 2 Peran dalam 1 Website (Guru & Siswa)
 
-**CHAMPIONS OF CALOR** adalah aplikasi game edukasi berbasis web interaktif (*HTML5, CSS3, & Modern Vanilla JavaScript*) yang dirancang khusus untuk pembelajaran kelompok siswa SMP Kelas VII pada materi **Kalor dan Perubahannya**.
+Aplikasi ini menggunakan **satu link website yang sama** dengan 2 mode tampilan terintegrasi:
 
-Game ini mengadaptasi ketegangan, estetika modern, dan format tantangan ilmiah ala **Clash of Champions**, dengan fokus pada penguatan **4 Keterampilan Kolaborasi Abad 21**:
-1. **Works Productively:** Setiap anggota berkontribusi aktif dalam penyelesaian tugas.
-2. **Demonstrates Respect:** Menghargai dan mendengarkan gagasan rekan sekelompok.
-3. **Compromises:** Mencapai titik temu dan mufakat saat terdapat silang pendapat.
-4. **Shared Responsibility:** Memikul tanggung jawab bersama atas keputusan dan capaian skor tim.
+### 1. 👨‍🏫 Peran GURU (Admin & Layar Proyektor Kelas)
+- **Perangkat:** Laptop / Komputer Guru yang terhubung ke **Proyektor Kelas** atau Smart Board.
+- **Fitur Utama Guru:**
+  - **Banner Kode Room Raksasa (Contoh: `COC-7A`):** Terpampang besar di layar proyektor agar mudah dibaca oleh seluruh siswa dari bangku mana pun.
+  - **Salin Kode & Link Siswa:** Sekali klik untuk menyalin kode room atau tautan langsung siswa.
+  - **Papan Klasemen Arena Live (Realtime Firebase):** Memantau seluruh kelompok siswa secara *live*. Saat siswa menjawab soal di HP mereka, nama kelompok, anggota tim, progres tantangan, dan skor totalnya **otomatis bergerak naik/turun di layar proyektor tanpa perlu di-refresh**.
+  - **Kontrol Sesi Kelas:** Membuat kode room acak baru, membuka panggung juara akhir (Podium), dan mencetak piagam/rekap nilai.
+
+### 2. 📱 Peran SISWA (Gawai HP Kelompok – 1 HP untuk 3–4 Siswa)
+- **Perangkat:** Cukup **1 HP pintar untuk satu kelompok** (3–4 siswa berkolaborasi bersama).
+- **Alur Siswa di HP:**
+  1. Siswa membuka web game di HP dan memilih **📱 Siswa (HP Kelompok)**.
+  2. Masukkan **Kode Room dari Guru** (misal: `COC-7A`).
+  3. Masukkan **Nama Kelompok** (misal: *Tim Joule*, *Tim Newton*, *Tim Kelvin*).
+  4. Masukkan **Nama 3–4 Anggota** beserta peran kolaborasi:
+     - 👑 **Juru Bicara:** Memimpin presentasi dan keputusan akhir.
+     - 🔍 **Pakar Konsep:** Menganalisis fenomena fisika kalor.
+     - 🔢 **Master Hitung:** Menghitung rumus matematis kalor.
+     - ⚖️ **Verifikator:** Memastikan seluruh anggota tim telah sepakat.
+  5. Mainkan 3 jenis game (Game A: Number Chains, Game B: Start Champ, Game C: Cryptarithm War).
+  6. Setiap kelompok mendapatkan poin, skor di HP dan di proyektor guru **langsung sinkron seketika melalui Firebase**!
+  7. Pada layar HP siswa terdapat status: *Nama Tim • Peringkat di Kelas • Poin Total*.
 
 ---
 
-## 🎮 Tiga Jenis Permainan
+## 🎮 Tiga Jenis Permainan Materi Kalor SMP Kelas VII
 
 ### 1. ⛓️ NUMBER CHAINS – Rantai Peristiwa Kalor
-- **Tujuan:** Melatih kemampuan mengurutkan kronologi proses fisika kalor secara logis dan ilmiah.
-- **Mekanisme:** 
-  - Kartu peristiwa disajikan secara acak.
-  - Siswa memindahkan kartu menggunakan sistem *Drag & Drop* atau tombol panah ▲/▼.
-  - Terdapat 5 tahapan komprehensif:
-    1. *Perjalanan Es Batu Menjadi Uap Air* (Pemanasan, kalor laten lebur, dan penguapan).
-    2. *Terjadinya Angin Laut di Pantai* (Konveksi alami udara & perbedaan kalor jenis).
-    3. *Rahasia Termos Menahan Kalor* (Isolator termal, refleksi perak, dan ruang hampa).
-    4. *Proses Pelepasan Kalor: Uap Menjadi Es* (Mengembun dan membeku).
-    5. *Keping Bimetal pada Setrika Otomatis* (Pemuaian zat padat & termostat otomatis).
-  - Dilengkapi tombol *Petunjuk Diskusi*, feedback visual seketika, dan modal pembahasan konsep lengkap.
+- **Tujuan:** Melatih kemampuan mengurutkan kronologi proses fisika kalor secara logis.
+- **Mekanisme:** Kartu disajikan acak. Siswa menggeser urutan kartu menggunakan tombol panah ▲/▼ atau touch drag di HP.
+- **5 Tahapan:**
+  1. *Perjalanan Es Batu Menjadi Uap Air* (Pemanasan es, kalor laten lebur 0°C, air mendidih, penguapan 100°C).
+  2. *Terjadinya Angin Laut di Pesisir Pantai* (Konveksi alami udara & perbedaan kalor jenis tanah vs air).
+  3. *Rahasia Termos Menahan Kalor* (Lapisan perak pantulkan radiasi, ruang hampa isolasi konduksi/konveksi, tutup penyekat).
+  4. *Proses Pelepasan Kalor: Uap Menjadi Es* (Mengembun dan membeku melepaskan kalor laten).
+  5. *Keping Bimetal pada Setrika Otomatis* (Pemuaian termal logam & termostat saklar otomatis).
 
 ### 2. 🎯 START CHAMP – Tantangan Mencocokkan Konsep
-- **Tujuan:** Mengidentifikasi dan mengaitkan fenomena nyata dalam kehidupan sehari-hari dengan konsep perpindahan serta perubahan kalor.
-- **Mekanisme:**
-  - Siswa disajikan 12 kartu fenomena berilustrasi SVG interaktif (3 ronde kompetisi).
-  - Siswa menghubungkan kartu peristiwa dengan bank konsep di sampingnya (Konduksi, Konveksi Cairan, Radiasi Termal, Menyerap/Melepas Kalor, Isolator/Konduktor Termal, Pemuaian Panjang, dsb.).
-  - Tombol copot pasangan (*unpair*), tombol periksa pasangan, dan pembahasan konsep per ronde.
+- **Tujuan:** Mengidentifikasi dan mencocokkan fenomena kehidupan nyata dengan konsep perpindahan serta perubahan kalor.
+- **Mekanisme:** 12 kasus fenomena berilustrasi vektor SVG (3 ronde kompetisi). Siswa mengetuk kartu kasus, lalu mengetuk konsep fisika yang cocok di HP.
 
 ### 3. ⚡ CRYPTARITHM WAR – Teka-Teki Angka Kalor
-- **Tujuan:** Mengasah kemampuan penalaran logis, berhitung matematis, dan pemecahan masalah berdasarkan persamaan kalor.
-- **Mekanisme:**
-  - Soal teka-teki persamaan kalor ($Q = m \cdot c \cdot \Delta T$, $Q = m \cdot L$, $T_2 = T_1 + \Delta T$, dan Asas Black $Q_{\text{lepas}} = Q_{\text{terima}}$).
-  - Digit misterius dikosongkan (contoh: $Q = [A][B]00 \text{ Joule}$, $T_2 = [X]5^\circ\text{C}$, dsb.).
-  - Tersedia **Papan Angka Digital (Numpad Touch)** untuk layar sentuh/proyektor serta dukungan keyboard fisik.
-  - **Kertas Cakar Digital (Whiteboard Layar Bawaan):** Siswa dapat mencoret-coret rumus dan kalkulasi langsung di layar tanpa perlu kertas tambahan!
+- **Tujuan:** Mengasah daya nalar matematis persamaan kalor ($Q = m \cdot c \cdot \Delta T$, $Q = m \cdot L$, $T_2 = T_1 + \Delta T$, dan Asas Black).
+- **Mekanisme:** Digit angka misterius yang hilang (misal: $Q = [A][B]00 \text{ Joule}$, $T_2 = [X]5^\circ\text{C}$). Tersedia **Papan Angka Sentuh (Touch Numpad)** di HP dan **Kertas Cakar Digital (Digital Whiteboard)** di layar HP.
 
 ---
 
-## 👥 Fitur Kolaborasi & Manajemen Kelompok
-- **Mode Multi-Tim:** Mendukung kompetisi antarkelompok (1 hingga 4 tim sekaligus: Tim Joule, Tim Kelvin, Tim Celsius, Tim Newton).
-- **Pembagian Peran Siswa (3–4 Siswa per Tim):**
-  - 👑 **Juru Bicara:** Memimpin presentasi dan mengambil keputusan akhir.
-  - 🔍 **Pakar Konsep:** Menganalisis hukum dan teori fisika kalor.
-  - 🔢 **Master Hitung:** Memimpin kalkulasi matematis persamaan kalor.
-  - ⚖️ **Verifikator:** Memastikan seluruh anggota setuju dan sepakat.
-- **Protokol Kesepakatan Tim:** Sebelum mengirim jawaban, kelompok dapat mengunci konsensus dan mendapatkan **+25 Bonus Poin Kolaborasi**.
-
----
-
-## 🔥 Integrasi Firebase Realtime Database Live
-Aplikasi langsung terhubung secara otomatis ke:
-- **URL Database:** `https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app/`
-- **Fitur Sinkronisasi Live:**
-  - Skor kelompok, anggota tim, dan progres tantangan langsung tersinkronkan antarperangkat (Laptop Guru/Proyektor & Gawai Siswa).
-  - Tautan Sesi Otomatis: Cukup bagikan URL dengan parameter room, misal: `https://suhu-number.vercel.app?room=COC-KALOR-7A`.
-- **Pengaturan Rules Realtime Database di Firebase Console:**
-  Buka [Firebase Console](https://console.firebase.google.com/) ➔ Realtime Database `suhunumber` ➔ Tab **Rules**, lalu masukkan aturan berikut agar dapat diakses oleh game kelas:
+## 🔥 Integrasi Firebase Realtime Database
+- **URL Database Aktif:** `https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app/`
+- **Aturan Akses (Rules) di Firebase Console:**
   ```json
   {
     "rules": {
@@ -79,47 +70,17 @@ Aplikasi langsung terhubung secara otomatis ke:
     }
   }
   ```
-  *(Atau sementara dalam mode uji coba: `{ "rules": { ".read": true, ".write": true } }`)*
-
----
-
-## 📊 Sistem Penilaian & Sertifikat
-- Skor otomatis untuk setiap tantangan yang benar (+100 hingga +150 poin).
-- Bonus kecepatan dan bonus kolaborasi kelompok.
-- Papan skor dan timer langsung (*live stopwatch*).
-- **Podium Juara Akhir:** Menampilkan Juara 1, 2, 3, dan Finalis lengkap dengan rincian perolehan poin tiap game.
-- **Cetak Laporan / Sertifikat Juara:** Fitur cetak ramah kertas (*print stylesheet*) untuk mencetak piagam penghargaan dan rekap nilai guru.
+  *(Atau dalam mode uji coba kelas: `{ "rules": { ".read": true, ".write": true } }`)*
 
 ---
 
 ## 🚀 Cara Menjalankan & Deploy ke Vercel
 
-### Opsi A: Jalankan Langsung di Komputer / Laptop (Offline 100%)
-1. Cukup buka file `index.html` dengan klik dua kali di browser mana saja (Google Chrome, Microsoft Edge, Safari, Firefox).
-2. Tidak membutuhkan server atau instalasi apapun.
+### Jalankan di Komputer / HP
+Cukup buka file `index.html` di browser laptop (untuk Guru) dan browser HP (untuk Siswa).
 
-### Opsi B: Deploy ke Vercel (1 Menit)
-Proyek ini dibuat menggunakan standar **HTML, CSS, dan JavaScript murni** (Zero Build Step), sehingga otomatis terdeteksi oleh Vercel:
-
-#### Cara 1: Menggunakan Vercel Dashboard (GitHub / Git)
-1. Unggah folder proyek ini ke repositori GitHub Anda.
-2. Masuk ke [vercel.com](https://vercel.com) dan klik **"Add New" ➔ "Project"**.
-3. Pilih repositori GitHub Anda.
-4. Klik tombol **"Deploy"** (biarkan pengaturan *Framework Preset* ke *Other* karena Vercel otomatis melayani situs statis).
-5. Aplikasi langsung aktif dan dapat diakses publik melalui URL `https://nama-proyek.vercel.app`!
-
-#### Cara 2: Menggunakan Vercel CLI
-```bash
-npm i -g vercel
-vercel
-```
-Tekan Enter untuk mengikuti panduan terminal, dan aplikasi akan langsung online!
-
----
-
-## 💻 Spesifikasi Teknis
-- **Bahasa:** HTML5, CSS3, Vanilla JavaScript (ES6+).
-- **Efek Audio:** Web Audio API (Sintesis suara *in-browser*, tanpa file MP3 eksternal, 100% andal tanpa risiko gagal muat).
-- **Efek Visual:** Kanvas Konfeti Kemenangan, Animasi CSS, dan Ilustrasi Vektor SVG Murni.
-- **Responsivitas:** Mendukung layar proyektor kelas (Full HD/HD), laptop guru & siswa, tablet, dan ponsel.
-- **Penyimpanan / Akun:** Tanpa registrasi akun atau login, langsung mulai bermain secara instan.
+### Deploy ke Vercel
+1. Unggah folder proyek ini ke repositori GitHub: `https://github.com/anandamutiarakasih-cpu/Suhu_number`.
+2. Masuk ke [vercel.com](https://vercel.com) ➔ **Add New Project** ➔ Pilih repositori GitHub.
+3. Klik **Deploy**.
+4. Guru membuka link di laptop proyektor (`?role=guru`), siswa membuka link di HP masing-masing (`?role=siswa`).
