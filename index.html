@@ -38,11 +38,23 @@
             </div>
         </div>
 
-        <div class="topbar-actions">
-            <div class="firebase-status-chip" id="firebaseStatusBadge" onclick="engine.openFirebaseModal()" title="Klik untuk Pengaturan Firebase Live Database">
-                <span class="fb-dot disconnected"></span>
-                <span>Mode Lokal</span>
+        <!-- Student Room Entry Area -->
+        <div class="student-room-bar">
+            <span class="student-label">🔑 Siswa Masuk:</span>
+            <div class="student-input-wrap">
+                <input type="text" id="studentRoomInput" placeholder="Kode Guru..." maxlength="10">
+                <button class="btn-student-join" onclick="engine.joinStudentRoom()">Gabung</button>
             </div>
+            <span class="student-active-badge" id="studentActiveRoomBadge">
+                🟢 Room: <strong class="active-room-display">COC-7A</strong>
+            </span>
+        </div>
+
+        <div class="topbar-actions">
+            <!-- Dedicated Teacher Button on the Top Right -->
+            <button class="btn-teacher-panel" onclick="engine.openTeacherPanel()" title="Klik untuk Buka Panel Guru & Salin Kode Sesi">
+                👨‍🏫 <strong>Guru</strong> <span class="teacher-code-pill active-room-display">COC-7A</span>
+            </button>
             <button class="btn-icon-action" id="btnToggleScratchpad" title="Buka Cakar-Cakar Digital">
                 ✏️ <span>Kertas Cakar</span>
             </button>
@@ -569,44 +581,55 @@
         </div>
     </div>
 
-    <!-- 5. Firebase Live Database Modal -->
-    <div class="modal-overlay hidden" id="firebaseModal">
+    <!-- 5. Teacher Live Room Modal (Tampilan Khusus Guru) -->
+    <div class="modal-overlay hidden" id="teacherModal">
         <div class="modal-card">
             <div class="modal-header">
-                <h3 class="modal-title">🔥 Pengaturan Firebase Live Database</h3>
-                <button class="modal-close-btn" onclick="engine.closeFirebaseModal()">✕</button>
+                <h3 class="modal-title">👨‍🏫 Panel Guru (Sesi Kelas Live)</h3>
+                <button class="modal-close-btn" onclick="engine.closeTeacherPanel()">✕</button>
             </div>
             <div class="modal-body">
-                <div style="background:rgba(6,182,212,0.12); border:1px solid var(--cyan-light); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:14px; font-size:0.85rem;">
-                    <strong>Database Aktif:</strong><br>
-                    <code style="color:var(--gold-light); word-break:break-all;">https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app/</code>
-                </div>
+                <p style="font-size:0.92rem; color:var(--text-secondary); margin-bottom:12px;">
+                    Tampilkan kode ini di depan kelas atau proyektor agar seluruh kelompok siswa dapat bergabung ke sesi kompetisi Anda:
+                </p>
 
-                <div class="fb-form-group">
-                    <label class="fb-form-label">Kode Room Kelas (Sesi Live):</label>
-                    <input type="text" class="fb-input-text" id="fbRoomInput" value="COC-KALOR-7A" placeholder="Contoh: KELAS-7A-KALOR">
-                </div>
-
-                <div class="fb-form-group">
-                    <label class="fb-form-label">Bagikan Link Room ke Siswa / Proyektor:</label>
-                    <div class="share-link-group">
-                        <input type="text" class="fb-input-text" id="fbShareLink" readonly>
-                        <button class="btn-game-action secondary" onclick="engine.copyShareLink()">📋 Salin</button>
+                <!-- Big Room Code Display for Projector -->
+                <div class="teacher-code-jumbo-box">
+                    <span class="jumbo-label">KODE ROOM KELAS</span>
+                    <div class="jumbo-code" id="teacherBigRoomCode">COC-7A</div>
+                    <div class="jumbo-buttons">
+                        <button class="btn-game-action primary" onclick="engine.copyTeacherCodeOnly()">
+                            📋 Salin Kode Guru
+                        </button>
+                        <button class="btn-game-action secondary" onclick="engine.teacherGenerateNewCode()">
+                            🔄 Buat Kode Baru
+                        </button>
                     </div>
                 </div>
 
-                <div class="fb-form-group">
-                    <label class="fb-form-label">Catatan Aturan Akses (Firebase Rules):</label>
-                    <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:10px; font-size:0.78rem; color:var(--text-secondary);">
-                        Pastikan tab <strong>Rules</strong> di Firebase Realtime Database mengizinkan baca & tulis untuk game:
-                        <pre style="color:#a7f3d0; margin-top:4px;">{ "rules": { ".read": true, ".write": true } }</pre>
+                <!-- Shareable link for students -->
+                <div class="fb-form-group" style="margin-top:16px;">
+                    <label class="fb-form-label">Tautan Otomatis Siswa (Siswa Langsung Masuk Room):</label>
+                    <div class="share-link-group">
+                        <input type="text" class="fb-input-text" id="teacherShareUrl" readonly>
+                        <button class="btn-game-action secondary" onclick="engine.copyTeacherFullLink()">📋 Salin Link</button>
+                    </div>
+                </div>
+
+                <!-- Live teams monitor on projector -->
+                <div style="margin-top:20px;">
+                    <h4 style="font-size:0.9rem; color:var(--gold-light); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>📡 Skor Kelompok Siswa Terhubung:</span>
+                        <span id="liveStatusDot" class="live-dot online" title="Status Database Online"></span>
+                    </h4>
+                    <div class="teacher-live-monitor-list" id="teacherLiveMonitorList">
+                        <!-- Injected by JavaScript -->
                     </div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
-                <button class="btn-game-action secondary" onclick="engine.closeFirebaseModal()">Tutup</button>
-                <button class="btn-game-action primary" onclick="engine.saveFirebaseConfig()">
-                    💾 Simpan & Sinkronkan Sesi
+            <div style="text-align:right; margin-top:20px;">
+                <button class="btn-game-action primary" onclick="engine.closeTeacherPanel()">
+                    Tutup & Lanjutkan Game 👍
                 </button>
             </div>
         </div>

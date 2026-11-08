@@ -968,54 +968,111 @@ class CoCGameEngine {
     }
 
     // ----------------------------------------------------
-    // FIREBASE LIVE MODAL
+    // GURU & SISWA ROOM SYNC CONTROLS
     // ----------------------------------------------------
-    openFirebaseModal() {
+    joinStudentRoom() {
+        const input = document.getElementById('studentRoomInput');
+        if (!input) return;
+        const code = input.value.trim().toUpperCase();
+        if (!code) {
+            this.showToast("Masukkan kode dari guru terlebih dahulu!");
+            window.soundFx.playWrong();
+            return;
+        }
+
+        if (window.firebaseSync) {
+            window.firebaseSync.setRoom(code);
+            window.soundFx.playCorrect();
+            this.showToast(`🎉 Berhasil bergabung ke Room Kelas: ${code}`);
+            input.value = '';
+            
+            // Perbarui badge
+            const badge = document.getElementById('studentActiveRoomBadge');
+            if (badge) {
+                badge.innerHTML = `🟢 Terhubung: <strong style="color:var(--gold-light);">${code}</strong>`;
+            }
+        }
+    }
+
+    openTeacherPanel() {
         window.soundFx.playClick();
-        const modal = document.getElementById('firebaseModal');
+        const modal = document.getElementById('teacherModal');
         if (!modal) return;
 
-        const currentRoom = window.firebaseSync ? window.firebaseSync.roomCode : "COC-KALOR-7A";
-        const roomInput = document.getElementById('fbRoomInput');
-        if (roomInput) roomInput.value = currentRoom;
+        const currentCode = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
+        const codeDisplay = document.getElementById('teacherBigRoomCode');
+        if (codeDisplay) codeDisplay.textContent = currentCode;
 
-        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoom}`;
-        const shareEl = document.getElementById('fbShareLink');
-        if (shareEl) shareEl.value = shareUrl;
+        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${currentCode}`;
+        const linkDisplay = document.getElementById('teacherShareUrl');
+        if (linkDisplay) linkDisplay.value = shareUrl;
+
+        // Render live teams monitor
+        this.renderTeacherLiveMonitor();
 
         modal.classList.remove('hidden');
     }
 
-    closeFirebaseModal() {
+    closeTeacherPanel() {
         window.soundFx.playClick();
-        document.getElementById('firebaseModal').classList.add('hidden');
+        document.getElementById('teacherModal').classList.add('hidden');
     }
 
-    saveFirebaseConfig() {
-        const roomInput = document.getElementById('fbRoomInput');
-        const roomVal = roomInput ? roomInput.value.trim() : '';
+    teacherGenerateNewCode() {
+        window.soundFx.playClick();
+        if (!window.firebaseSync) return;
 
-        if (window.firebaseSync && roomVal) {
-            window.firebaseSync.roomCode = roomVal.toUpperCase();
-            window.firebaseSync.listenToRoom(window.firebaseSync.roomCode);
-            this.showToast(`🔥 Terhubung ke Room: ${window.firebaseSync.roomCode}`);
-        }
+        const newCode = window.firebaseSync.generateRandomCode();
+        window.firebaseSync.setRoom(newCode);
 
-        this.closeFirebaseModal();
-        this.updateScoreboards();
+        const codeDisplay = document.getElementById('teacherBigRoomCode');
+        if (codeDisplay) codeDisplay.textContent = newCode;
+
+        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${newCode}`;
+        const linkDisplay = document.getElementById('teacherShareUrl');
+        if (linkDisplay) linkDisplay.value = shareUrl;
+
+        this.showToast(`✨ Kode Room baru dibuat: ${newCode}`);
     }
 
-    copyShareLink() {
-        const shareInput = document.getElementById('fbShareLink');
-        if (shareInput) {
-            shareInput.select();
-            navigator.clipboard.writeText(shareInput.value).then(() => {
-                this.showToast("📋 Link Room berhasil disalin ke clipboard!");
-                window.soundFx.playClick();
-            }).catch(() => {
-                this.showToast("Pilih dan salin teks link manual.");
-            });
-        }
+    copyTeacherCodeOnly() {
+        const code = window.firebaseSync ? window.firebaseSync.roomCode : "COC-7A";
+        navigator.clipboard.writeText(code).then(() => {
+            window.soundFx.playCorrect();
+            this.showToast(`📋 Kode "${code}" berhasil disalin! Berikan ke siswa.`);
+        }).catch(() => {
+            this.showToast(`Kode room: ${code}`);
+        });
+    }
+
+    copyTeacherFullLink() {
+        const linkDisplay = document.getElementById('teacherShareUrl');
+        if (!linkDisplay) return;
+        linkDisplay.select();
+        navigator.clipboard.writeText(linkDisplay.value).then(() => {
+            window.soundFx.playCorrect();
+            this.showToast("📋 Link Room siswa berhasil disalin ke clipboard!");
+        }).catch(() => {
+            this.showToast("Salin teks link secara manual.");
+        });
+    }
+
+    renderTeacherLiveMonitor() {
+        const monitorContainer = document.getElementById('teacherLiveMonitorList');
+        if (!monitorContainer) return;
+
+        monitorContainer.innerHTML = this.teams.map((t, idx) => `
+            <div class="teacher-team-row">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="team-color-dot" style="background:${t.color}"></span>
+                    <strong>${t.name}</strong>
+                    <small style="color:var(--text-muted)">(${t.members.map(m => m.name).join(', ')})</small>
+                </div>
+                <div style="font-family:var(--font-mono); font-weight:800; color:var(--gold-light);">
+                    ${t.totalScore} pt
+                </div>
+            </div>
+        `).join('');
     }
 
     // ----------------------------------------------------

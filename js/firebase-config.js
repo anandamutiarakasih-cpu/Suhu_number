@@ -1,102 +1,88 @@
 /**
- * Firebase Realtime Database & Live Sync Manager
- * Database: https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app/
+ * Firebase Realtime Database Live Classroom Sync
+ * Otomatis terhubung ke: https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app/
  */
 
 class FirebaseLiveSync {
     constructor() {
+        this.databaseURL = "https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app";
+        this.projectId = "suhunumber";
+        this.roomCode = "COC-7A"; // Default room code yang mudah diucapkan di kelas
         this.app = null;
         this.db = null;
         this.isConnected = false;
-        this.roomCode = "COC-KALOR-7A";
         this.isBroadcasting = false;
-
-        // Default konfigurasi Firebase terhubung langsung ke database suhunumber
-        this.defaultConfig = {
-            databaseURL: "https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "suhunumber"
-        };
-
-        this.config = this.loadStoredConfig() || this.defaultConfig;
-    }
-
-    loadStoredConfig() {
-        try {
-            const saved = localStorage.getItem('coc_firebase_config');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (parsed && parsed.databaseURL) return parsed;
-            }
-        } catch (e) {
-            console.warn('Gagal membaca saved Firebase config:', e);
-        }
-        return null;
-    }
-
-    saveConfig(newConfig) {
-        this.config = newConfig;
-        try {
-            localStorage.setItem('coc_firebase_config', JSON.stringify(newConfig));
-        } catch (e) {}
+        this.currentRoomRef = null;
     }
 
     init() {
         if (typeof firebase === 'undefined') {
-            console.log('Firebase SDK belum aktif atau offline.');
-            this.updateStatusBadge(false, "Mode Lokal (Offline)");
+            console.warn('Firebase SDK offline.');
             return;
         }
-
-        const dbUrl = this.config.databaseURL || this.defaultConfig.databaseURL;
 
         try {
             if (!firebase.apps.length) {
                 this.app = firebase.initializeApp({
-                    databaseURL: dbUrl,
-                    projectId: this.config.projectId || "suhunumber",
-                    apiKey: this.config.apiKey || undefined
+                    databaseURL: this.databaseURL,
+                    projectId: this.projectId
                 });
             } else {
                 this.app = firebase.app();
             }
 
             this.db = firebase.database();
-            
-            // Monitor status koneksi internal Firebase
+
+            // Cek URL params jika ada ?room=KODE
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            if (roomParam) {
+                this.roomCode = roomParam.toUpperCase().trim();
+            } else {
+                const savedRoom = localStorage.getItem('coc_active_room');
+                if (savedRoom) this.roomCode = savedRoom.toUpperCase().trim();
+            }
+
+            // Monitor status koneksi ke server Firebase
             const connectedRef = this.db.ref(".info/connected");
             connectedRef.on("value", (snap) => {
-                if (snap.val() === true) {
-                    this.isConnected = true;
-                    this.updateStatusBadge(true, `Live: ${this.roomCode}`);
-                    console.log('Terhubung ke Firebase Realtime Database!');
-                } else {
-                    this.isConnected = false;
-                    this.updateStatusBadge(false, `Menghubungkan: ${this.roomCode}...`);
-                }
+                this.isConnected = (snap.val() === true);
+                this.updateUIStatus();
             });
 
+            // Langsung dengarkan room aktif
             this.listenToRoom(this.roomCode);
         } catch (err) {
-            console.error('Koneksi Firebase gagal diinisialisasi:', err);
-            this.isConnected = false;
-            this.updateStatusBadge(false, "Gagal Konek Firebase");
+            console.error('Firebase auto-connect error:', err);
         }
     }
 
-    updateStatusBadge(connected, text) {
-        const badge = document.getElementById('firebaseStatusBadge');
-        if (!badge) return;
-        badge.innerHTML = `
-            <span class="fb-dot ${connected ? 'connected' : 'disconnected'}"></span>
-            <span>${text}</span>
-        `;
+    updateUIStatus() {
+        // Update badge siswa & guru
+        const codeDisplays = document.querySelectorAll('.active-room-display');
+        codeDisplays.forEach(el => el.textContent = this.roomCode);
+
+        const statusDot = document.getElementById('liveStatusDot');
+        if (statusDot) {
+            statusDot.className = `live-dot ${this.isConnected ? 'online' : 'offline'}`;
+        }
+    }
+
+    setRoom(newCode) {
+        if (!newCode) return;
+        this.roomCode = newCode.toUpperCase().trim();
+        try {
+            localStorage.setItem('coc_active_room', this.roomCode);
+        } catch (e) {}
+
+        this.listenToRoom(this.roomCode);
+        this.updateUIStatus();
     }
 
     listenToRoom(roomCode) {
         if (!this.db) return;
-        this.roomCode = (roomCode || "COC-KALOR-7A").toUpperCase().trim();
+        this.roomCode = roomCode.toUpperCase().trim();
 
-        // Lepas listener lama jika ada
         if (this.currentRoomRef) {
             this.currentRoomRef.off();
         }
@@ -109,14 +95,8 @@ class FirebaseLiveSync {
                     window.engine.syncFromFirebase(data.teams);
                 }
             }
-        }, (error) => {
-            console.warn('Firebase RTDB listener notice:', error);
-            if (error.code === 'PERMISSION_DENIED') {
-                this.updateStatusBadge(false, "Aturan Firebase Terkunci");
-                if (window.engine) {
-                    window.engine.showToast("⚠️ Firebase: Ubah Rules ke Read/Write: true di Firebase Console");
-                }
-            }
+        }, (err) => {
+            console.warn('Notice Firebase RTDB:', err.message);
         });
     }
 
@@ -133,24 +113,19 @@ class FirebaseLiveSync {
         this.db.ref(`coc_rooms/${this.roomCode}`).set(payload)
             .then(() => {
                 this.isBroadcasting = false;
-                this.updateStatusBadge(true, `Live: ${this.roomCode}`);
             })
-            .catch(err => {
-                console.warn('Gagal broadcast skor:', err);
+            .catch(() => {
                 this.isBroadcasting = false;
-                if (err.code === 'PERMISSION_DENIED') {
-                    this.updateStatusBadge(false, "Aturan Firebase Terkunci");
-                }
             });
     }
 
-    logEvent(message) {
-        if (!this.db) return;
-        const logRef = this.db.ref(`coc_rooms/${this.roomCode}/logs`).push();
-        logRef.set({
-            message: message,
-            timestamp: Date.now()
-        });
+    generateRandomCode() {
+        const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const nums = "23456789";
+        let code = "COC-";
+        for (let i = 0; i < 3; i++) code += letters.charAt(Math.floor(Math.random() * letters.length));
+        code += nums.charAt(Math.floor(Math.random() * nums.length));
+        return code;
     }
 }
 

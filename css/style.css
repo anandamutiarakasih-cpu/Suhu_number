@@ -1778,8 +1778,192 @@ body {
 }
 
 /* -------------------------------------------------------------------
-   FIREBASE LIVE MULTIPLAYER & ROOM SYNC STYLES
+   SISWA & GURU LIVE CLASSROOM STYLES
 ------------------------------------------------------------------- */
+.student-room-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-pill);
+    padding: 4px 12px;
+}
+
+.student-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--cyan-light);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.student-input-wrap {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 2px 4px 2px 10px;
+}
+
+#studentRoomInput {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 0.82rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    text-transform: uppercase;
+    width: 105px;
+    outline: none;
+}
+
+#studentRoomInput::placeholder {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.btn-student-join {
+    background: linear-gradient(135deg, #06b6d4, #0284c7);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-student-join:hover {
+    filter: brightness(1.15);
+    transform: scale(1.03);
+}
+
+.student-active-badge {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Dedicated Teacher Button at Top Right */
+.btn-teacher-panel {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.25));
+    border: 1px solid var(--gold-main);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+}
+
+.btn-teacher-panel:hover {
+    background: linear-gradient(135deg, var(--gold-main), #d97706);
+    color: #070b19;
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.45);
+    transform: translateY(-1px);
+}
+
+.teacher-code-pill {
+    background: #070b19;
+    border: 1px solid var(--gold-light);
+    color: var(--gold-light);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+}
+
+.btn-teacher-panel:hover .teacher-code-pill {
+    background: #070b19;
+    color: #fbbf24;
+}
+
+/* Jumbo Code Box for Teacher Projector */
+.teacher-code-jumbo-box {
+    background: linear-gradient(145deg, #090e1d, #141d36);
+    border: 2px solid var(--gold-main);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    text-align: center;
+    margin: 16px 0;
+    box-shadow: 0 0 35px rgba(245, 158, 11, 0.25);
+}
+
+.jumbo-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    letter-spacing: 1.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.jumbo-code {
+    font-size: 3.4rem;
+    font-family: var(--font-mono);
+    font-weight: 900;
+    color: var(--gold-light);
+    letter-spacing: 4px;
+    margin: 10px 0 16px;
+    text-shadow: 0 0 25px rgba(245, 158, 11, 0.6);
+}
+
+.jumbo-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.teacher-team-row {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.live-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.live-dot.online {
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+}
+
+.live-dot.offline {
+    background: #f97316;
+}
+
+@media (max-width: 1050px) {
+    .app-topbar {
+        flex-wrap: wrap;
+    }
+    .student-room-bar {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        margin-top: 8px;
+    }
+}
+
 .firebase-status-chip {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-subtle);
