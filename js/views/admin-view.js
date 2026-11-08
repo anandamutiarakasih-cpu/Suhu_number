@@ -8,93 +8,36 @@ import { firebaseService } from '../services/firebase-service.js';
 import { audio } from '../services/audio-service.js';
 import { toast } from '../components/notification.js';
 import { exportSessionToCSV } from '../services/export-service.js';
-import { ADMIN_CREDENTIALS } from '../config/firebase-config.js';
 
 export function renderAdminView(container, { onExit }) {
   let activeSessionCode = null;
   let unsubscribe = null;
   let currentSessionData = null;
 
-  // Initial State: Admin Passcode Login
   container.innerHTML = `
     <div class="tc-view tc-admin-view">
       <div class="tc-top-bar">
-        <button id="btn-admin-exit" class="tc-btn tc-btn-ghost">← Keluar</button>
-        <div class="tc-badge-lab">ADMIN GURU FISIKA SMP</div>
+        <button id="btn-admin-exit" class="tc-btn tc-btn-ghost">← Kembali ke Beranda</button>
+        <div class="tc-badge-lab"><span class="tc-pulse-dot"></span> PUSAT KENDALI LAPTOP GURU</div>
       </div>
 
-      <div class="tc-card tc-admin-login-card" id="admin-auth-card">
-        <div class="tc-role-icon">💻</div>
-        <h2 class="tc-card-title">Pusat Otoritas Guru & Pengawas</h2>
-        <p class="tc-card-subtitle">Masukkan kode otentikasi instruktur untuk membuka kendali permainan kelas.</p>
-
-        <form id="form-admin-login" class="tc-form">
-          <div class="tc-input-group">
-            <label for="admin-pass">KODE AKSES INSTRUKTUR</label>
-            <input 
-              type="password" 
-              id="admin-pass" 
-              class="tc-input" 
-              placeholder="Masukkan kode akses guru" 
-              value="THERMO2026"
-              required 
-            />
-            <small class="tc-hint">Default Classroom Passcode: <code>THERMO2026</code></small>
-          </div>
-          <button type="submit" class="tc-btn tc-btn-primary tc-btn-block">
-            <span>BUKA PUSAT KENDALI</span>
-            <span>🔐</span>
-          </button>
-        </form>
-      </div>
-
-      <div id="admin-dashboard-container" style="display: none;"></div>
-    </div>
-  `;
-
-  const btnExit = container.querySelector('#btn-admin-exit');
-  btnExit.addEventListener('click', () => {
-    audio.playClick();
-    if (unsubscribe) unsubscribe();
-    if (onExit) onExit();
-  });
-
-  const formLogin = container.querySelector('#form-admin-login');
-  formLogin.addEventListener('submit', (e) => {
-    e.preventDefault();
-    audio.playClick();
-    const pass = container.querySelector('#admin-pass').value.trim();
-    if (pass === ADMIN_CREDENTIALS.passcode || pass.toLowerCase() === 'guru' || pass.toLowerCase() === 'admin') {
-      toast.success('Otentikasi Berhasil. Selamat mengajar!');
-      container.querySelector('#admin-auth-card').style.display = 'none';
-      renderDashboard();
-    } else {
-      toast.error('Kode akses salah. Periksa kembali.');
-    }
-  });
-
-  function renderDashboard() {
-    const dashEl = container.querySelector('#admin-dashboard-container');
-    dashEl.style.display = 'block';
-
-    dashEl.innerHTML = `
-      <div class="tc-admin-cockpit">
+      <div class="tc-admin-cockpit" id="admin-cockpit-main">
         <!-- Dashboard Top Header -->
         <div class="tc-cockpit-header">
           <div>
-            <div class="tc-badge-lab"><span class="tc-pulse-dot"></span> PUSAT KENDALI LAPTOP GURU</div>
-            <h2 class="tc-cockpit-title">Kontrol Sesi & Pemantauan 8 Kelompok</h2>
+            <div class="tc-badge-lab">KONTROL KELAS MULTIPLAYER</div>
+            <h2 class="tc-cockpit-title">Pusat Kendali Sesi & Pemantauan 8 Kelompok</h2>
           </div>
           
           <div class="tc-cockpit-session-box" id="session-box-controls">
             <div class="tc-code-display">
-              <span class="tc-code-lbl">KODE SESI SISWA</span>
-              <span class="tc-code-val" id="disp-session-code">BELUM DIBUAT</span>
+              <span class="tc-code-lbl">KODE SESI SISWA:</span>
+              <span class="tc-code-val" id="disp-session-code">MEMBUAT KODE...</span>
             </div>
             <div class="tc-code-btn-group">
               <button id="btn-copy-code" class="tc-btn tc-btn-sm tc-btn-outline" title="Salin Kode Sesi">📋 Salin</button>
               <button id="btn-copy-link" class="tc-btn tc-btn-sm tc-btn-secondary" title="Salin Link HP Siswa">🔗 Salin Link HP</button>
-              <button id="btn-create-new-session" class="tc-btn tc-btn-sm tc-btn-primary">+ Sesi Baru</button>
+              <button id="btn-create-new-session" class="tc-btn tc-btn-sm tc-btn-primary" title="Buat Kode Sesi Baru">+ Sesi Baru</button>
             </div>
           </div>
         </div>
@@ -103,7 +46,7 @@ export function renderAdminView(container, { onExit }) {
         <div class="tc-card tc-phase-bar-card">
           <div class="tc-phase-bar-title">KENDALI FASE PERMAINAN (SERENTAK TERSINKRON KE SELURUH HP SISWA)</div>
           <div class="tc-phase-btn-row">
-            <button class="tc-btn tc-btn-phase" data-phase="LOBBY" id="phase-btn-lobby">
+            <button class="tc-btn tc-btn-phase active" data-phase="LOBBY" id="phase-btn-lobby">
               <span class="tc-phase-num">0</span>
               <span>Lobi Persiapan</span>
             </button>
@@ -183,137 +126,152 @@ export function renderAdminView(container, { onExit }) {
           </div>
         </div>
       </div>
-    `;
+    </div>
+  `;
 
-    // Hook buttons
-    const btnCreateSession = dashEl.querySelector('#btn-create-new-session');
-    const btnCopyCode = dashEl.querySelector('#btn-copy-code');
-    const btnCopyLink = dashEl.querySelector('#btn-copy-link');
-    const btnExportCSV = dashEl.querySelector('#btn-export-csv');
-    const btnSimulate = dashEl.querySelector('#btn-simulate-teams');
-    const btnReset = dashEl.querySelector('#btn-reset-session');
-    const dispCode = dashEl.querySelector('#disp-session-code');
+  const btnExit = container.querySelector('#btn-admin-exit');
+  btnExit.addEventListener('click', () => {
+    audio.playClick();
+    if (unsubscribe) unsubscribe();
+    if (onExit) onExit();
+  });
 
-    // Create Session
-    btnCreateSession.addEventListener('click', async () => {
-      audio.playClick();
-      try {
-        const session = await firebaseService.createSession();
-        activeSessionCode = session.code;
-        dispCode.textContent = activeSessionCode;
-        toast.success(`Sesi ${activeSessionCode} berhasil dibuat dan aktif.`);
-        attachSessionListener(activeSessionCode);
-      } catch (err) {
-        toast.error('Gagal membuat sesi: ' + err.message);
-      }
-    });
+  const btnCreateSession = container.querySelector('#btn-create-new-session');
+  const btnCopyCode = container.querySelector('#btn-copy-code');
+  const btnCopyLink = container.querySelector('#btn-copy-link');
+  const btnExportCSV = container.querySelector('#btn-export-csv');
+  const btnSimulate = container.querySelector('#btn-simulate-teams');
+  const btnReset = container.querySelector('#btn-reset-session');
+  const dispCode = container.querySelector('#disp-session-code');
 
-    // Copy Code
-    btnCopyCode.addEventListener('click', () => {
-      audio.playClick();
-      if (!activeSessionCode) {
-        toast.warning('Buat sesi terlebih dahulu.');
-        return;
-      }
-      navigator.clipboard.writeText(activeSessionCode).then(() => {
-        toast.success(`Kode ${activeSessionCode} disalin ke clipboard!`);
-      }).catch(() => {
-        toast.info(`Kode Sesi: ${activeSessionCode}`);
-      });
-    });
-
-    // Copy Direct Student Link
-    if (btnCopyLink) {
-      btnCopyLink.addEventListener('click', () => {
-        audio.playClick();
-        if (!activeSessionCode) {
-          toast.warning('Buat sesi terlebih dahulu.');
-          return;
-        }
-        const studentUrl = new URL(window.location.origin + window.location.pathname);
-        studentUrl.searchParams.set('session', activeSessionCode);
-        navigator.clipboard.writeText(studentUrl.toString()).then(() => {
-          toast.success('Link HP Siswa disalin! Bagikan ke grup WhatsApp siswa.');
-        }).catch(() => {
-          toast.info(studentUrl.toString());
-        });
-      });
-    }
-
-    // Phase Switch Buttons
-    const phaseButtons = dashEl.querySelectorAll('.tc-btn-phase');
-    phaseButtons.forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        audio.playClick();
-        if (!activeSessionCode) {
-          toast.warning('Buat sesi terlebih dahulu.');
-          return;
-        }
-        const targetPhase = btn.dataset.phase;
-        try {
-          await firebaseService.setSessionPhase(activeSessionCode, targetPhase);
-          audio.playPhaseTransition();
-          toast.success(`Fase berhasil dialihkan ke: ${targetPhase}`);
-        } catch (err) {
-          toast.error('Gagal mengubah fase: ' + err.message);
-        }
-      });
-    });
-
-    // Export CSV
-    btnExportCSV.addEventListener('click', () => {
-      audio.playClick();
-      if (!activeSessionCode || !currentSessionData) {
-        toast.warning('Belum ada sesi aktif atau data kelompok.');
-        return;
-      }
-      exportSessionToCSV(activeSessionCode, currentSessionData);
-    });
-
-    // Simulate 8 Teams
-    btnSimulate.addEventListener('click', async () => {
-      audio.playClick();
-      if (!activeSessionCode) {
-        toast.warning('Buat sesi terlebih dahulu.');
-        return;
-      }
-      btnSimulate.disabled = true;
-      btnSimulate.innerHTML = '<span>Menyiapkan 8 Kelompok...</span>';
-      try {
-        await firebaseService.simulate8Teams(activeSessionCode);
-        toast.success('8 kelompok simulasi berhasil diaktifkan dengan nilai contoh.');
-        audio.playCorrect();
-      } catch (err) {
-        toast.error('Gagal simulasi: ' + err.message);
-      } finally {
-        btnSimulate.disabled = false;
-        btnSimulate.innerHTML = '<span>⚡ Simulasi 8 Kelompok Uji</span>';
-      }
-    });
-
-    // Reset Session
-    btnReset.addEventListener('click', async () => {
-      audio.playClick();
-      if (!activeSessionCode) {
-        toast.warning('Belum ada sesi yang aktif.');
-        return;
-      }
-      if (confirm(`Yakin ingin mereset seluruh nilai kelompok pada sesi ${activeSessionCode}?`)) {
-        await firebaseService.resetSession(activeSessionCode);
-        toast.info('Nilai sesi berhasil direset ke nol.');
-      }
-    });
-
-    // Automatically create session or pick saved
-    const saved = firebaseService.getStoredTeamSession();
-    if (saved && saved.sessionCode) {
-      activeSessionCode = saved.sessionCode;
+  // Create Session Function
+  async function createSessionNow() {
+    audio.playClick();
+    btnCreateSession.disabled = true;
+    btnCreateSession.textContent = 'Membuat...';
+    try {
+      const session = await firebaseService.createSession();
+      activeSessionCode = session.code;
       dispCode.textContent = activeSessionCode;
+      localStorage.setItem('tc_active_admin_session', activeSessionCode);
+      toast.success(`Kode Sesi ${activeSessionCode} berhasil dibuat & aktif!`);
       attachSessionListener(activeSessionCode);
-    } else {
-      btnCreateSession.click();
+    } catch (err) {
+      console.warn('createSession fallback:', err);
+      // Instant guaranteed fallback
+      const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+      let code = 'TC';
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      activeSessionCode = code;
+      dispCode.textContent = activeSessionCode;
+      localStorage.setItem('tc_active_admin_session', activeSessionCode);
+      toast.success(`Kode Sesi ${activeSessionCode} aktif!`);
+      attachSessionListener(activeSessionCode);
+    } finally {
+      btnCreateSession.disabled = false;
+      btnCreateSession.textContent = '+ Sesi Baru';
     }
   }
+
+  btnCreateSession.addEventListener('click', () => {
+    createSessionNow();
+  });
+
+  // Copy Code
+  btnCopyCode.addEventListener('click', () => {
+    audio.playClick();
+    if (!activeSessionCode || activeSessionCode === 'MEMBUAT KODE...') {
+      toast.warning('Sedang menyiapkan kode sesi...');
+      return;
+    }
+    navigator.clipboard.writeText(activeSessionCode).then(() => {
+      toast.success(`Kode ${activeSessionCode} disalin ke clipboard!`);
+    }).catch(() => {
+      prompt('Salin Kode Sesi Guru:', activeSessionCode);
+    });
+  });
+
+  // Copy Direct Link for Student Mobile Devices
+  btnCopyLink.addEventListener('click', () => {
+    audio.playClick();
+    if (!activeSessionCode || activeSessionCode === 'MEMBUAT KODE...') {
+      toast.warning('Sedang menyiapkan kode sesi...');
+      return;
+    }
+    const studentUrl = new URL(window.location.origin + window.location.pathname);
+    studentUrl.searchParams.set('session', activeSessionCode);
+    navigator.clipboard.writeText(studentUrl.toString()).then(() => {
+      toast.success('Link HP Siswa disalin! Bagikan ke grup kelas WhatsApp.');
+    }).catch(() => {
+      prompt('Salin Link HP Siswa:', studentUrl.toString());
+    });
+  });
+
+  // Phase Switch Buttons
+  const phaseButtons = container.querySelectorAll('.tc-btn-phase');
+  phaseButtons.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      audio.playClick();
+      if (!activeSessionCode) {
+        toast.warning('Buat sesi terlebih dahulu.');
+        return;
+      }
+      const targetPhase = btn.dataset.phase;
+      try {
+        await firebaseService.setSessionPhase(activeSessionCode, targetPhase);
+        audio.playPhaseTransition();
+        toast.success(`Fase berhasil dialihkan ke: ${targetPhase}`);
+      } catch (err) {
+        toast.error('Gagal mengubah fase: ' + err.message);
+      }
+    });
+  });
+
+  // Export CSV
+  btnExportCSV.addEventListener('click', () => {
+    audio.playClick();
+    if (!activeSessionCode || !currentSessionData) {
+      toast.warning('Belum ada sesi aktif atau data kelompok.');
+      return;
+    }
+    exportSessionToCSV(activeSessionCode, currentSessionData);
+  });
+
+  // Simulate 8 Teams
+  btnSimulate.addEventListener('click', async () => {
+    audio.playClick();
+    if (!activeSessionCode) {
+      toast.warning('Buat sesi terlebih dahulu.');
+      return;
+    }
+    btnSimulate.disabled = true;
+    btnSimulate.innerHTML = '<span>Menyiapkan 8 Kelompok...</span>';
+    try {
+      await firebaseService.simulate8Teams(activeSessionCode);
+      toast.success('8 kelompok simulasi berhasil diaktifkan dengan nilai contoh.');
+      audio.playCorrect();
+    } catch (err) {
+      toast.error('Gagal simulasi: ' + err.message);
+    } finally {
+      btnSimulate.disabled = false;
+      btnSimulate.innerHTML = '<span>⚡ Simulasi 8 Kelompok Uji</span>';
+    }
+  });
+
+  // Reset Session
+  btnReset.addEventListener('click', async () => {
+    audio.playClick();
+    if (!activeSessionCode) {
+      toast.warning('Belum ada sesi yang aktif.');
+      return;
+    }
+    if (confirm(`Yakin ingin mereset seluruh nilai kelompok pada sesi ${activeSessionCode}?`)) {
+      await firebaseService.resetSession(activeSessionCode);
+      toast.info('Nilai sesi berhasil direset ke nol.');
+    }
+  });
 
   function attachSessionListener(code) {
     if (unsubscribe) unsubscribe();
@@ -377,6 +335,16 @@ export function renderAdminView(container, { onExit }) {
         }
       }
     });
+  }
+
+  // Check saved admin session or create immediately
+  const existingCode = localStorage.getItem('tc_active_admin_session');
+  if (existingCode && existingCode.startsWith('TC')) {
+    activeSessionCode = existingCode;
+    dispCode.textContent = activeSessionCode;
+    attachSessionListener(activeSessionCode);
+  } else {
+    createSessionNow();
   }
 
   return {

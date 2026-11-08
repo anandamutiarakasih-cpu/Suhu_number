@@ -1,7 +1,7 @@
 /**
  * CHAMPIONS OF CALOR: CLASH OF SCIENCE
  * Firebase Service & Realtime Synchronization Engine
- * Dual-Sync: Firebase RTDB + Global Cloud Relay (SSE/REST) + BroadcastChannel + LocalStorage
+ * Dual-Sync: Firebase RTDB (CDN/Compat/Modular) + Global Cloud Relay (SSE/REST) + BroadcastChannel + LocalStorage
  */
 
 import { firebaseConfig } from '../config/firebase-config.js';
@@ -18,6 +18,7 @@ class FirebaseService {
     this.broadcast = null;
     this.listeners = new Map();
     this.activeSSE = new Map();
+    this.sessionsCache = new Map();
 
     this.initBroadcastChannel();
     this.initFirebase();
@@ -37,43 +38,68 @@ class FirebaseService {
   }
 
   async initFirebase() {
+    // 1. Try global window.firebase from CDN first (fastest & most reliable)
+    if (typeof window !== 'undefined' && window.firebase) {
+      try {
+        if (!window.firebase.apps || !window.firebase.apps.length) {
+          this.app = window.firebase.initializeApp(firebaseConfig);
+        } else {
+          this.app = window.firebase.app();
+        }
+        this.db = firebaseConfig.databaseURL ? window.firebase.database(this.app, firebaseConfig.databaseURL) : window.firebase.database();
+        this.fbRef = (db, path) => db.ref(path);
+        this.fbSet = (ref, val) => ref.set(val);
+        this.fbUpdate = (ref, val) => ref.update(val);
+        this.fbOnValue = (ref, cb) => ref.on('value', cb);
+        this.fbGet = (ref) => (ref.get ? ref.get() : ref.once('value'));
+        this.isFirebaseReady = true;
+        this.isOnline = true;
+        console.log('🟢 Firebase RTDB Initialized via CDN:', firebaseConfig.databaseURL);
+
+        // Listen for server time offset & connection
+        const offsetRef = this.db.ref('.info/serverTimeOffset');
+        offsetRef.on('value', (snap) => {
+          this.serverTimeOffset = snap.val() || 0;
+        });
+
+        const connRef = this.db.ref('.info/connected');
+        connRef.on('value', (snap) => {
+          this.isOnline = !!snap.val();
+        });
+
+        return;
+      } catch (e) {
+        console.warn('CDN Firebase init error:', e);
+      }
+    }
+
+    // 2. Fallback to modular dynamic import
     try {
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
       const { getDatabase, ref, onValue, set, update, get } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js');
-      const { getAuth, signInAnonymously } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js');
 
       this.app = initializeApp(firebaseConfig);
       this.db = firebaseConfig.databaseURL ? getDatabase(this.app, firebaseConfig.databaseURL) : getDatabase(this.app);
-      this.auth = getAuth(this.app);
       this.fbRef = ref;
       this.fbOnValue = onValue;
       this.fbSet = set;
       this.fbUpdate = update;
       this.fbGet = get;
 
-      try {
-        await signInAnonymously(this.auth);
-      } catch (authErr) {
-        console.info('ℹ️ Firebase Anonymous Auth notice: sinkronisasi berjalan via RTDB rules langsung.');
-      }
-
-      // Server time offset
       const offsetRef = ref(this.db, '.info/serverTimeOffset');
       onValue(offsetRef, (snap) => {
         this.serverTimeOffset = snap.val() || 0;
       });
 
-      // Connection status
       const connRef = ref(this.db, '.info/connected');
       onValue(connRef, (snap) => {
-        const val = snap.val();
-        this.isOnline = !!val;
-        console.log(val ? '🟢 Firebase RTDB Online: ' + firebaseConfig.databaseURL : '🟠 Firebase RTDB Connecting...');
+        this.isOnline = !!snap.val();
       });
 
       this.isFirebaseReady = true;
+      console.log('🟢 Firebase RTDB Initialized via Modular ESM');
     } catch (err) {
-      console.warn('⚠️ Firebase initial connection note (falling back to Cloud Relay & Local):', err.message);
+      console.warn('⚠️ Firebase initial note (falling back to Cloud Relay & LocalStorage):', err.message);
       this.isFirebaseReady = false;
     }
   }
@@ -85,6 +111,9 @@ class FirebaseService {
   handleBroadcastMessage(msg) {
     if (!msg || !msg.type) return;
     const { sessionCode, data } = msg;
+    if (data) {
+      this.sessionsCache.set(sessionCode, data);
+    }
     if (this.listeners.has(sessionCode)) {
       const callbacks = this.listeners.get(sessionCode);
       callbacks.forEach((cb) => cb(data));
@@ -95,26 +124,33 @@ class FirebaseService {
    * NOTIFY SESSION UPDATE ACROSS ALL CHANNELS
    */
   notifySessionUpdate(sessionCode, sessionData) {
-    // 1. In-process subscribers
+    if (!sessionCode || !sessionData) return;
+
+    // Cache in memory
+    this.sessionsCache.set(sessionCode, sessionData);
+
+    // In-process subscribers
     if (this.listeners.has(sessionCode)) {
       this.listeners.get(sessionCode).forEach((cb) => cb(sessionData));
     }
 
-    // 2. BroadcastChannel for same browser tabs
+    // BroadcastChannel for same browser tabs
     if (this.broadcast) {
-      this.broadcast.postMessage({
-        type: 'SESSION_UPDATE',
-        sessionCode,
-        data: sessionData
-      });
+      try {
+        this.broadcast.postMessage({
+          type: 'SESSION_UPDATE',
+          sessionCode,
+          data: sessionData
+        });
+      } catch (e) {}
     }
 
-    // 3. LocalStorage persistence
+    // LocalStorage persistence
     try {
       localStorage.setItem(`tc_session_${sessionCode}`, JSON.stringify(sessionData));
     } catch (e) {}
 
-    // 4. Global Cloud Relay (Internet Relay for cross-network mobile & laptop)
+    // Global Cloud Relay (Internet Relay for cross-network mobile & laptop)
     this.publishToCloudRelay(sessionCode, sessionData);
   }
 
@@ -130,14 +166,12 @@ class FirebaseService {
   async publishToCloudRelay(sessionCode, sessionData) {
     if (!sessionCode || !sessionData) return;
     try {
-      await fetch(`https://ntfy.sh/suhu_number_${sessionCode}`, {
+      fetch(`https://ntfy.sh/suhu_number_${sessionCode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sessionData)
-      });
-    } catch (err) {
-      // Silently proceed
-    }
+      }).catch(() => {});
+    } catch (err) {}
   }
 
   async fetchFromCloudRelay(sessionCode) {
@@ -172,6 +206,7 @@ class FirebaseService {
           if (payload && payload.message) {
             const data = JSON.parse(payload.message);
             if (data && data.code === sessionCode) {
+              this.sessionsCache.set(sessionCode, data);
               try {
                 localStorage.setItem(`tc_session_${sessionCode}`, JSON.stringify(data));
               } catch (e) {}
@@ -189,7 +224,7 @@ class FirebaseService {
   }
 
   /**
-   * CREATE A NEW GAME SESSION
+   * CREATE A NEW GAME SESSION (INSTANT & NON-BLOCKING)
    */
   async createSession(title = 'Sesi Pembelajaran Kalor SMP Kelas VII') {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -208,19 +243,29 @@ class FirebaseService {
       phaseDuration: 0,
       teams: {},
       settings: {
-        game1Duration: 180, // Number Chains
-        game2Duration: 180, // Start Champ
-        game3Duration: 240, // Cryptarithm War
+        game1Duration: 180,
+        game2Duration: 180,
+        game3Duration: 240,
         maxTeams: 8
       }
     };
 
-    if (this.isFirebaseReady && this.db) {
+    // Cache immediately in memory & storage
+    this.sessionsCache.set(code, sessionData);
+    try {
+      localStorage.setItem(`tc_session_${code}`, JSON.stringify(sessionData));
+    } catch (e) {}
+
+    // Non-blocking background write to Firebase RTDB
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
       try {
         const sRef = this.fbRef(this.db, `sessions/${code}`);
-        await this.fbSet(sRef, sessionData);
+        const p = this.fbSet(sRef, sessionData);
+        if (p && typeof p.catch === 'function') {
+          p.catch((e) => console.warn('Firebase set session background:', e));
+        }
       } catch (e) {
-        console.warn('Firebase set session error:', e);
+        console.warn('Firebase ref error:', e);
       }
     }
 
@@ -277,13 +322,15 @@ class FirebaseService {
     if (!session.teams) session.teams = {};
     session.teams[`team_${num}`] = teamData;
 
-    if (this.isFirebaseReady && this.db) {
+    this.sessionsCache.set(sessionCode, session);
+
+    // Non-blocking background sync
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
       try {
         const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${num}`);
-        await this.fbSet(teamRef, teamData);
-      } catch (e) {
-        console.warn('Firebase join error:', e);
-      }
+        const p = this.fbSet(teamRef, teamData);
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (e) {}
     }
 
     this.notifySessionUpdate(sessionCode, session);
@@ -310,18 +357,20 @@ class FirebaseService {
     session.phaseStartTime = this.getServerTime();
     session.phaseDuration = duration;
 
-    if (this.isFirebaseReady && this.db) {
+    this.sessionsCache.set(sessionCode, session);
+
+    // Background Firebase sync
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
       try {
         const sessionRef = this.fbRef(this.db, `sessions/${sessionCode}`);
-        await this.fbUpdate(sessionRef, {
+        const p = this.fbUpdate(sessionRef, {
           status: phase,
           currentPhase: phase,
           phaseStartTime: session.phaseStartTime,
           phaseDuration: duration
         });
-      } catch (e) {
-        console.warn('Firebase setPhase error:', e);
-      }
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (e) {}
     }
 
     this.notifySessionUpdate(sessionCode, session);
@@ -338,12 +387,9 @@ class FirebaseService {
     }
 
     const team = session.teams[`team_${teamNumber}`];
-    
-    // Each stage correct = 5 pts (5 x 5 = 25 pts)
     let score = correctCount * 5;
-    // Perfect bonus = +5 pts if all 5 are correct
     if (correctCount === totalStages) {
-      score += 5;
+      score += 5; // Perfect 5/5 bonus
     }
     score = Math.min(30, Math.round(score * 10) / 10);
 
@@ -353,15 +399,18 @@ class FirebaseService {
     if (!team.progress) team.progress = {};
     team.progress.game1Submitted = true;
 
-    if (this.isFirebaseReady && this.db) {
+    this.sessionsCache.set(sessionCode, session);
+
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
       try {
         const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${teamNumber}`);
-        await this.fbUpdate(teamRef, {
+        const p = this.fbUpdate(teamRef, {
           'scores/game1': score,
           'scores/total': team.scores.total,
           'progress/game1Submitted': true,
           predicate: team.predicate
         });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {}
     }
 
@@ -386,8 +435,6 @@ class FirebaseService {
     }
 
     const team = session.teams[`team_${teamNumber}`];
-
-    // Base score: 2.5 pts per correct match (12 x 2.5 = 30 pts)
     let score = (correctCount * 2.5) + (Number(speedBonus) || 0);
     score = Math.min(35, Math.round(score * 10) / 10);
 
@@ -397,15 +444,18 @@ class FirebaseService {
     if (!team.progress) team.progress = {};
     team.progress.game2Submitted = true;
 
-    if (this.isFirebaseReady && this.db) {
+    this.sessionsCache.set(sessionCode, session);
+
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
       try {
         const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${teamNumber}`);
-        await this.fbUpdate(teamRef, {
+        const p = this.fbUpdate(teamRef, {
           'scores/game2': score,
           'scores/total': team.scores.total,
           'progress/game2Submitted': true,
           predicate: team.predicate
         });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {}
     }
 
@@ -429,8 +479,6 @@ class FirebaseService {
     }
 
     const team = session.teams[`team_${teamNumber}`];
-
-    // Base score: 5.0 pts per correct calculation (6 x 5.0 = 30 pts)
     let score = (correctCount * 5.0) + (Number(speedBonus) || 0);
     score = Math.min(35, Math.round(score * 10) / 10);
 
@@ -440,15 +488,18 @@ class FirebaseService {
     if (!team.progress) team.progress = {};
     team.progress.game3Submitted = true;
 
-    if (this.isFirebaseReady && this.db) {
+    this.sessionsCache.set(sessionCode, session);
+
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
       try {
         const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${teamNumber}`);
-        await this.fbUpdate(teamRef, {
+        const p = this.fbUpdate(teamRef, {
           'scores/game3': score,
           'scores/total': team.scores.total,
           'progress/game3Submitted': true,
           predicate: team.predicate
         });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {}
     }
 
@@ -481,10 +532,13 @@ class FirebaseService {
       });
     }
 
-    if (this.isFirebaseReady && this.db) {
+    this.sessionsCache.set(sessionCode, session);
+
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
       try {
         const sessionRef = this.fbRef(this.db, `sessions/${sessionCode}`);
-        await this.fbSet(sessionRef, session);
+        const p = this.fbSet(sessionRef, session);
+        if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {}
     }
 
@@ -521,7 +575,6 @@ class FirebaseService {
       [{ name: 'Wahyu Nugroho', absen: '06' }, { name: 'Yusuf Habibi', absen: '09' }, { name: 'Zahra Cantika', absen: '12' }]
     ];
 
-    // Realistic varied scores matching 30 / 35 / 35
     const sampleScores = [
       { g1: 30, g2: 34.5, g3: 35 },     // 99.5 - Champion
       { g1: 27.5, g2: 32, g3: 32.5 },   // 92.0 - Champion
@@ -562,10 +615,13 @@ class FirebaseService {
       };
     }
 
-    if (this.isFirebaseReady && this.db) {
+    this.sessionsCache.set(sessionCode, session);
+
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
       try {
         const teamsRef = this.fbRef(this.db, `sessions/${sessionCode}/teams`);
-        await this.fbSet(teamsRef, session.teams);
+        const p = this.fbSet(teamsRef, session.teams);
+        if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {}
     }
 
@@ -577,39 +633,42 @@ class FirebaseService {
    * LISTEN TO SESSION IN REALTIME (FIREBASE + CLOUD RELAY + STORAGE)
    */
   listenToSession(sessionCode, callback) {
-    if (!this.listeners.has(sessionCode)) {
-      this.listeners.set(sessionCode, new Set());
+    if (!sessionCode) return () => {};
+    const cleanCode = String(sessionCode).trim().toUpperCase();
+
+    if (!this.listeners.has(cleanCode)) {
+      this.listeners.set(cleanCode, new Set());
     }
-    this.listeners.get(sessionCode).add(callback);
+    this.listeners.get(cleanCode).add(callback);
 
     // Initial load
-    this.getSession(sessionCode).then((s) => {
+    this.getSession(cleanCode).then((s) => {
       if (s) callback(s);
     });
 
     // 1. Firebase Live Listener
-    if (this.isFirebaseReady && this.db) {
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbOnValue) {
       try {
-        const sRef = this.fbRef(this.db, `sessions/${sessionCode}`);
+        const sRef = this.fbRef(this.db, `sessions/${cleanCode}`);
         this.fbOnValue(sRef, (snap) => {
-          const val = snap.val();
+          const val = typeof snap.val === 'function' ? snap.val() : null;
           if (val) {
-            this.notifySessionUpdate(sessionCode, val);
+            this.notifySessionUpdate(cleanCode, val);
           }
         });
       } catch (e) {}
     }
 
     // 2. Global Cloud Relay SSE Listener
-    const cleanupSSE = this.listenToCloudRelay(sessionCode, (data) => {
-      if (this.listeners.has(sessionCode)) {
-        this.listeners.get(sessionCode).forEach((cb) => cb(data));
+    const cleanupSSE = this.listenToCloudRelay(cleanCode, (data) => {
+      if (this.listeners.has(cleanCode)) {
+        this.listeners.get(cleanCode).forEach((cb) => cb(data));
       }
     });
 
     // 3. Storage event for multi-tab
     const storageHandler = (e) => {
-      if (e.key === `tc_session_${sessionCode}` && e.newValue) {
+      if (e.key === `tc_session_${cleanCode}` && e.newValue) {
         try {
           const val = JSON.parse(e.newValue);
           callback(val);
@@ -619,8 +678,8 @@ class FirebaseService {
     window.addEventListener('storage', storageHandler);
 
     return () => {
-      if (this.listeners.has(sessionCode)) {
-        this.listeners.get(sessionCode).delete(callback);
+      if (this.listeners.has(cleanCode)) {
+        this.listeners.get(cleanCode).delete(callback);
       }
       if (cleanupSSE) cleanupSSE();
       window.removeEventListener('storage', storageHandler);
@@ -628,35 +687,59 @@ class FirebaseService {
   }
 
   /**
-   * GET SESSION (FIREBASE -> CLOUD RELAY -> LOCALSTORAGE)
+   * GET SESSION (MEMORY -> LOCALSTORAGE -> FIREBASE -> CLOUD RELAY)
    */
   async getSession(sessionCode) {
-    // 1. Firebase RTDB
-    if (this.isFirebaseReady && this.db) {
+    if (!sessionCode) return null;
+    const cleanCode = String(sessionCode).trim().toUpperCase();
+
+    // 1. In-memory cache (0ms instant)
+    if (this.sessionsCache.has(cleanCode)) {
+      return this.sessionsCache.get(cleanCode);
+    }
+
+    // 2. LocalStorage (0ms instant)
+    const local = this.getLocalSession(cleanCode);
+    if (local) {
+      this.sessionsCache.set(cleanCode, local);
+      return local;
+    }
+
+    // 3. Firebase RTDB with fast 1.5s timeout (never hangs)
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbGet) {
       try {
-        const sRef = this.fbRef(this.db, `sessions/${sessionCode}`);
-        const snap = await this.fbGet(sRef);
-        if (snap.exists()) {
-          const val = snap.val();
-          try {
-            localStorage.setItem(`tc_session_${sessionCode}`, JSON.stringify(val));
-          } catch (e) {}
-          return val;
+        const sRef = this.fbRef(this.db, `sessions/${cleanCode}`);
+        const fetchPromise = Promise.resolve(this.fbGet(sRef));
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+        const snap = await Promise.race([fetchPromise, timeoutPromise]);
+        if (snap) {
+          const val = typeof snap.val === 'function' ? snap.val() : (snap.exists && snap.exists() ? snap.val() : null);
+          if (val) {
+            try {
+              localStorage.setItem(`tc_session_${cleanCode}`, JSON.stringify(val));
+            } catch (e) {}
+            this.sessionsCache.set(cleanCode, val);
+            return val;
+          }
         }
       } catch (e) {}
     }
 
-    // 2. Global Cloud Relay
-    const cloudSession = await this.fetchFromCloudRelay(sessionCode);
-    if (cloudSession) {
-      try {
-        localStorage.setItem(`tc_session_${sessionCode}`, JSON.stringify(cloudSession));
-      } catch (e) {}
-      return cloudSession;
-    }
+    // 4. Global Cloud Relay with fast timeout
+    try {
+      const relayPromise = this.fetchFromCloudRelay(cleanCode);
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+      const cloudSession = await Promise.race([relayPromise, timeoutPromise]);
+      if (cloudSession) {
+        try {
+          localStorage.setItem(`tc_session_${cleanCode}`, JSON.stringify(cloudSession));
+        } catch (e) {}
+        this.sessionsCache.set(cleanCode, cloudSession);
+        return cloudSession;
+      }
+    } catch (e) {}
 
-    // 3. Fallback to LocalStorage
-    return this.getLocalSession(sessionCode);
+    return null;
   }
 
   saveTeamSession(sessionCode, teamNumber, teamName) {

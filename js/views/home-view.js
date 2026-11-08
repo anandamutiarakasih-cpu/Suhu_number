@@ -73,9 +73,9 @@ export function renderHomeView(container, { onJoinTeam, onOpenAdmin }) {
             Pantau 8 kelompok secara live dari laptop, kendalikan timer & babak serentak, serta unduh rekap nilai CSV tanpa proyektor.
           </p>
           <div class="tc-admin-action-wrap">
-            <button id="btn-goto-admin" class="tc-btn tc-btn-outline tc-btn-block">
-              <span>LOGIN ADMIN GURU</span>
-              <span class="tc-btn-arrow">⚙️</span>
+            <button id="btn-goto-admin" class="tc-btn tc-btn-primary tc-btn-block">
+              <span>BUAT KODE SESI / KENDALI GURU</span>
+              <span class="tc-btn-arrow">➔</span>
             </button>
           </div>
         </div>
