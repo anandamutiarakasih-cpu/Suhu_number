@@ -1378,6 +1378,15 @@ class CoCGameEngine {
                 scratchDrawer.classList.remove('open');
             });
         }
+
+        // Backdrop click to dismiss modals safely
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        });
     }
 }
 

@@ -703,7 +703,7 @@
             <h3 class="modal-title" id="completeModalTitle" style="font-size:1.8rem; margin-bottom:12px;">Tantangan Selesai!</h3>
             <p id="completeModalMessage" style="font-size:1.05rem; color:var(--text-secondary); margin-bottom:24px; line-height:1.6;"></p>
             <div>
-                <button class="btn-game-action primary" id="btnCompleteDone">
+                <button class="btn-game-action primary" id="btnCompleteDone" onclick="document.getElementById('completeModal').classList.add('hidden'); if(window.engine) window.engine.renderLobby();">
                     Lanjut ke Klasemen / Menu Utama ➔
                 </button>
             </div>
