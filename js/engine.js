@@ -976,15 +976,12 @@ class CoCGameEngine {
         if (!modal) return;
 
         const currentRoom = window.firebaseSync ? window.firebaseSync.roomCode : "COC-KALOR-7A";
-        document.getElementById('fbRoomInput').value = currentRoom;
-
-        const currentCfg = window.firebaseSync ? window.firebaseSync.config : {};
-        if (currentCfg && currentCfg.apiKey) {
-            document.getElementById('fbConfigInput').value = JSON.stringify(currentCfg, null, 2);
-        }
+        const roomInput = document.getElementById('fbRoomInput');
+        if (roomInput) roomInput.value = currentRoom;
 
         const shareUrl = `${window.location.origin}${window.location.pathname}?room=${currentRoom}`;
-        document.getElementById('fbShareLink').value = shareUrl;
+        const shareEl = document.getElementById('fbShareLink');
+        if (shareEl) shareEl.value = shareUrl;
 
         modal.classList.remove('hidden');
     }
@@ -995,27 +992,13 @@ class CoCGameEngine {
     }
 
     saveFirebaseConfig() {
-        const roomInput = document.getElementById('fbRoomInput').value.trim();
-        const cfgText = document.getElementById('fbConfigInput').value.trim();
+        const roomInput = document.getElementById('fbRoomInput');
+        const roomVal = roomInput ? roomInput.value.trim() : '';
 
-        if (window.firebaseSync) {
-            if (roomInput) {
-                window.firebaseSync.roomCode = roomInput.toUpperCase();
-            }
-
-            if (cfgText) {
-                try {
-                    const parsed = JSON.parse(cfgText);
-                    window.firebaseSync.saveConfig(parsed);
-                    window.firebaseSync.init();
-                    this.showToast("🔥 Konfigurasi Firebase tersimpan!");
-                } catch (e) {
-                    alert("Format JSON konfigurasi Firebase tidak valid!");
-                    return;
-                }
-            } else {
-                window.firebaseSync.listenToRoom(window.firebaseSync.roomCode);
-            }
+        if (window.firebaseSync && roomVal) {
+            window.firebaseSync.roomCode = roomVal.toUpperCase();
+            window.firebaseSync.listenToRoom(window.firebaseSync.roomCode);
+            this.showToast(`🔥 Terhubung ke Room: ${window.firebaseSync.roomCode}`);
         }
 
         this.closeFirebaseModal();

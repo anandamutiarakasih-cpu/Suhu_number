@@ -59,6 +59,30 @@ Game ini mengadaptasi ketegangan, estetika modern, dan format tantangan ilmiah a
 
 ---
 
+## 🔥 Integrasi Firebase Realtime Database Live
+Aplikasi langsung terhubung secara otomatis ke:
+- **URL Database:** `https://suhunumber-default-rtdb.asia-southeast1.firebasedatabase.app/`
+- **Fitur Sinkronisasi Live:**
+  - Skor kelompok, anggota tim, dan progres tantangan langsung tersinkronkan antarperangkat (Laptop Guru/Proyektor & Gawai Siswa).
+  - Tautan Sesi Otomatis: Cukup bagikan URL dengan parameter room, misal: `https://suhu-number.vercel.app?room=COC-KALOR-7A`.
+- **Pengaturan Rules Realtime Database di Firebase Console:**
+  Buka [Firebase Console](https://console.firebase.google.com/) ➔ Realtime Database `suhunumber` ➔ Tab **Rules**, lalu masukkan aturan berikut agar dapat diakses oleh game kelas:
+  ```json
+  {
+    "rules": {
+      "coc_rooms": {
+        "$roomCode": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    }
+  }
+  ```
+  *(Atau sementara dalam mode uji coba: `{ "rules": { ".read": true, ".write": true } }`)*
+
+---
+
 ## 📊 Sistem Penilaian & Sertifikat
 - Skor otomatis untuk setiap tantangan yang benar (+100 hingga +150 poin).
 - Bonus kecepatan dan bonus kolaborasi kelompok.

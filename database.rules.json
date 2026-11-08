@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "coc_rooms": {
+      "$roomCode": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}
