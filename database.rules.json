@@ -1,5 +1,13 @@
 {
   "rules": {
+    ".read": true,
+    ".write": true,
+    "sessions": {
+      "$sessionId": {
+        ".read": true,
+        ".write": true
+      }
+    },
     "coc_rooms": {
       "$roomCode": {
         ".read": true,
