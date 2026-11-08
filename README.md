@@ -1,4 +1,4 @@
-# CHAMPIONS OF CALOR: CLASH OF SCIENCE
+# GAME KALOR: CLASH OF SCIENCE
 > **Permainan Pembelajaran IPA Materi KALOR untuk Siswa SMP Kelas VII**  
 > *Format Kompetisi Akademik Terinspirasi dari Clash of Champions (CoC)*
 
@@ -6,7 +6,7 @@
 
 ## 1. Tentang Aplikasi
 
-**CHAMPIONS OF CALOR: CLASH OF SCIENCE** adalah aplikasi web edukatif interaktif bertema laboratorium sains futuristik yang dirancang untuk pembelajaran materi **Kalor tingkat SMP Kelas VII**.
+**GAME KALOR: CLASH OF SCIENCE** adalah aplikasi web edukatif interaktif bertema laboratorium sains futuristik yang dirancang untuk pembelajaran materi **Kalor tingkat SMP Kelas VII**.
 
 Aplikasi ini menggunakan konsep kompetisi antarkelompok (hingga **8 kelompok**) yang mengutamakan:
 - Keterampilan kolaborasi & musyawarah

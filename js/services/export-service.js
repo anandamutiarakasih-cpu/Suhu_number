@@ -63,7 +63,7 @@ export function exportSessionToCSV(sessionCode, sessionData) {
 
   const now = new Date().toISOString().slice(0, 10);
   link.setAttribute('href', url);
-  link.setAttribute('download', `Hasil_Thermo_Champions_${sessionCode}_${now}.csv`);
+  link.setAttribute('download', `Hasil_Game_Kalor_${sessionCode}_${now}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

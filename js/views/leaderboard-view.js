@@ -22,7 +22,7 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
           KLASEMEN AKHIR JUARA SAINS
         </div>
         <h1 class="tc-lb-title">
-          CHAMPIONS OF <span class="tc-text-gradient">CALOR</span>
+          JUARA GAME <span class="tc-text-gradient">KALOR</span>
         </h1>
         <div class="tc-session-tag">SESI KELAS: <strong>${sessionCode}</strong></div>
       </header>

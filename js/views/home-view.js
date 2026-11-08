@@ -23,9 +23,9 @@ export function renderHomeView(container, { onJoinTeam, onOpenAdmin }) {
           LABORATORIUM FISIKA KALOR SMP KELAS VII
         </div>
         <h1 class="tc-main-title">
-          CHAMPIONS OF <span class="tc-text-gradient">CALOR</span>
+          GAME <span class="tc-text-gradient">KALOR</span>
         </h1>
-        <div class="tc-sub-title">CLASH OF SCIENCE • SUHU & KALOR EDITION</div>
+        <div class="tc-sub-title">CLASH OF SCIENCE • IPA SMP KELAS VII</div>
         <p class="tc-home-desc">
           Game edukasi sains interaktif terinspirasi Clash of Champions. 
           8 kelompok siswa bertanding kolaboratif menguji rantai peristiwa kalor, 
