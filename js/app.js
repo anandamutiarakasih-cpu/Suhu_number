@@ -17,6 +17,7 @@ import { renderGame1View } from './views/game1-view.js';
 import { renderGame2View } from './views/game2-view.js';
 import { renderGame3View } from './views/game3-view.js';
 import { renderLeaderboardView } from './views/leaderboard-view.js';
+import { loadStyle, preloadStyle } from './utils/asset-loader.js';
 
 class ChampionsOfCalorApp {
   constructor() {
@@ -305,6 +306,7 @@ class ChampionsOfCalorApp {
         break;
 
       case 'waiting':
+        preloadStyle('css/game1.css?v=2.4');
         this.currentViewInstance = renderWaitingView(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -327,6 +329,8 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game1':
+        loadStyle('css/game1.css?v=2.4');
+        preloadStyle('css/game2.css?v=2.4');
         this.currentViewInstance = renderGame1View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -344,6 +348,8 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game2':
+        loadStyle('css/game2.css?v=2.4');
+        preloadStyle('css/game3.css?v=2.4');
         this.currentViewInstance = renderGame2View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -361,6 +367,8 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game3':
+        loadStyle('css/game3.css?v=2.4');
+        preloadStyle('css/leaderboard.css?v=2.4');
         this.currentViewInstance = renderGame3View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -378,6 +386,7 @@ class ChampionsOfCalorApp {
         break;
 
       case 'leaderboard':
+        loadStyle('css/leaderboard.css?v=2.4');
         this.currentViewInstance = renderLeaderboardView(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,

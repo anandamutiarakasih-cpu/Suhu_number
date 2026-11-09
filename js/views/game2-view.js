@@ -11,8 +11,10 @@ import { audio } from '../services/audio-service.js';
 import { toast } from '../components/notification.js';
 import { showLabModal } from '../components/modal.js';
 import { networkService } from '../services/network-service.js';
+import { loadStyle } from '../utils/asset-loader.js';
 
 export function renderGame2View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
+  loadStyle('css/game2.css?v=2.4');
   const ROUND_SIZE = 4;
   const TOTAL_ROUNDS = Math.ceil(START_CHAMP_DATA.length / ROUND_SIZE); // 3 rounds
   let currentRound = 0;

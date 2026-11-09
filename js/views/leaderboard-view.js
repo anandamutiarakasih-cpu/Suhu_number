@@ -9,8 +9,10 @@ import { particleService } from '../services/particle-service.js';
 import { getPredicate } from '../data/predicates.js';
 import { exportSessionToCSV } from '../services/export-service.js';
 import { networkService } from '../services/network-service.js';
+import { loadStyle } from '../utils/asset-loader.js';
 
 export function renderLeaderboardView(container, { sessionCode, teamNumber, onHome, onPhaseChange }) {
+  loadStyle('css/leaderboard.css?v=2.4');
   let sessionUnsubscribe = null;
   let currentSession = null;
   let detachNet = null;

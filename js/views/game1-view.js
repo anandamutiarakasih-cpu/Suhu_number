@@ -11,8 +11,10 @@ import { audio } from '../services/audio-service.js';
 import { toast } from '../components/notification.js';
 import { showLabModal } from '../components/modal.js';
 import { networkService } from '../services/network-service.js';
+import { loadStyle } from '../utils/asset-loader.js';
 
 export function renderGame1View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
+  loadStyle('css/game1.css?v=2.4');
   let currentStageIndex = 0;
   let stageCards = [];
   let userOrder = {}; // cardIdx (0..4) -> step (1..5)

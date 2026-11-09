@@ -12,8 +12,10 @@ import { toast } from '../components/notification.js';
 import { showLabModal } from '../components/modal.js';
 import { Scratchpad } from '../components/scratchpad.js';
 import { networkService } from '../services/network-service.js';
+import { loadStyle } from '../utils/asset-loader.js';
 
 export function renderGame3View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
+  loadStyle('css/game3.css?v=2.4');
   let currentIndex = 0;
   let timerInstance = null;
   let sessionUnsubscribe = null;
