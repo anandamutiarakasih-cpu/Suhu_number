@@ -10,7 +10,7 @@ class ParticleService {
     this.particles = [];
     this.animationId = null;
     this.isRunning = false;
-    this.maxParticles = 55;
+    this.maxParticles = typeof window !== 'undefined' && window.innerWidth < 768 ? 16 : 45;
   }
 
   init(canvasElement) {
@@ -36,6 +36,7 @@ class ParticleService {
     if (!this.canvas) return;
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
+    this.maxParticles = window.innerWidth < 768 ? 16 : 45;
   }
 
   createParticles() {

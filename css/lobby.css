@@ -87,6 +87,43 @@
   flex-grow: 1;
 }
 
+.tc-role-student {
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.tc-role-student:hover {
+  border-color: rgba(249, 115, 22, 0.6);
+  box-shadow: 0 10px 30px var(--tc-orange-glow);
+}
+
+.tc-role-admin {
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.tc-role-admin:hover {
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 10px 30px var(--tc-sky-glow);
+}
+
+.tc-join-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tc-admin-action-wrap {
+  margin-top: auto;
+}
+
+.tc-btn-arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.tc-btn:hover .tc-btn-arrow {
+  transform: translateX(4px);
+}
+
 .tc-preview-bar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -537,6 +574,14 @@
   font-size: 0.95rem;
 }
 
+.tc-lobby-team-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
 .tc-lobby-team-status {
   font-size: 0.78rem;
   color: #64748b;
@@ -573,6 +618,12 @@
   border: 1.5px solid var(--tc-border);
   border-radius: var(--radius-lg);
   padding: 0.75rem 1.25rem;
+}
+
+.tc-code-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .tc-code-lbl {
@@ -734,9 +785,41 @@
   border: 1px solid rgba(34, 197, 94, 0.4);
 }
 
+.tc-atc-badge.lag {
+  background: rgba(250, 204, 21, 0.2);
+  color: #fde047;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+}
+
+.tc-atc-badge.disconnected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
 .tc-atc-badge.offline {
   background: rgba(255, 255, 255, 0.08);
   color: #64748b;
+}
+
+.tc-dot-yellow {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: var(--tc-yellow);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--tc-yellow);
+  margin-right: 4px;
+}
+
+.tc-dot-red {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: var(--tc-red);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--tc-red);
+  margin-right: 4px;
 }
 
 .tc-atc-name {

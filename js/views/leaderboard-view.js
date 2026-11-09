@@ -8,15 +8,21 @@ import { audio } from '../services/audio-service.js';
 import { particleService } from '../services/particle-service.js';
 import { getPredicate } from '../data/predicates.js';
 import { exportSessionToCSV } from '../services/export-service.js';
+import { networkService } from '../services/network-service.js';
 
-export function renderLeaderboardView(container, { sessionCode, teamNumber, onHome }) {
+export function renderLeaderboardView(container, { sessionCode, teamNumber, onHome, onPhaseChange }) {
   let sessionUnsubscribe = null;
   let currentSession = null;
+  let detachNet = null;
 
   container.innerHTML = `
     <div class="tc-view tc-leaderboard-view">
       <!-- Header Banner -->
       <header class="tc-lb-header">
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+          <div id="lb-net-badge-wrap"></div>
+          <div class="tc-session-tag">SESI KELAS: <strong>${sessionCode}</strong></div>
+        </div>
         <div class="tc-badge-lab">
           <span class="tc-pulse-dot"></span>
           KLASEMEN AKHIR JUARA SAINS
@@ -24,7 +30,6 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
         <h1 class="tc-lb-title">
           JUARA GAME <span class="tc-text-gradient">KALOR</span>
         </h1>
-        <div class="tc-session-tag">SESI KELAS: <strong>${sessionCode}</strong></div>
       </header>
 
       <!-- Olympic Style Podium for Top 3 -->
@@ -107,7 +112,7 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
       <!-- Footer Action -->
       <div class="tc-lb-footer">
         <button id="btn-lb-home" class="tc-btn tc-btn-primary tc-btn-large">
-          <span>KEMBALI KE BERANDA</span>
+          <span>KEMBALI KE DASHBOARD</span>
           <span>🏠</span>
         </button>
       </div>
@@ -124,6 +129,12 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
   const tableBody = container.querySelector('#lb-table-body');
   const btnExport = container.querySelector('#btn-lb-export-csv');
   const btnHome = container.querySelector('#btn-lb-home');
+
+  // Attach Network Latency Monitor
+  const netWrap = container.querySelector('#lb-net-badge-wrap');
+  if (netWrap) {
+    detachNet = networkService.attachBadge(netWrap);
+  }
 
   btnExport.addEventListener('click', () => {
     audio.playClick();
@@ -142,7 +153,22 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
     if (!session) return;
     currentSession = session;
 
-    const teams = Object.values(session.teams || {});
+    // If teacher resets or switches phase to another game or lobby
+    if (session.currentPhase && session.currentPhase !== 'FINISHED') {
+      audio.playPhaseTransition();
+      cleanup();
+      if (onPhaseChange) {
+        onPhaseChange(session.currentPhase, session);
+      }
+      return;
+    }
+
+    const rawTeams = Object.values(session.teams || {});
+    // Prioritize claimed teams or teams with scores
+    let teams = rawTeams.filter((t) => t && (t.claimed || (t.scores && t.scores.total > 0)));
+    if (teams.length === 0) {
+      teams = rawTeams;
+    }
     // Sort descending by total score
     teams.sort((a, b) => (b.scores?.total || 0) - (a.scores?.total || 0));
 
@@ -227,6 +253,7 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
 
   function cleanup() {
     if (sessionUnsubscribe) sessionUnsubscribe();
+    if (detachNet) detachNet();
   }
 
   return {

@@ -5,6 +5,10 @@
 
 import { particleService } from './services/particle-service.js';
 import { firebaseService } from './services/firebase-service.js';
+import { audio } from './services/audio-service.js';
+import { toast } from './components/notification.js';
+import { showLabModal } from './components/modal.js';
+import { networkService } from './services/network-service.js';
 import { renderHomeView } from './views/home-view.js';
 import { renderRegisterView } from './views/register-view.js';
 import { renderWaitingView } from './views/waiting-view.js';
@@ -32,48 +36,206 @@ class ChampionsOfCalorApp {
       particleService.init(this.canvas);
     }
 
-    // Check for existing saved team session (survives page refresh / reconnect)
-    const stored = firebaseService.getStoredTeamSession();
-    if (stored && stored.sessionCode && stored.teamNumber) {
-      this.state.sessionCode = stored.sessionCode;
-      this.state.teamNumber = stored.teamNumber;
-      this.reconnectSession(stored.sessionCode, stored.teamNumber);
-    } else {
-      // Check if session code was passed in URL (e.g. ?session=TC1234)
-      let urlCode = null;
+    // Attach Refresh / BeforeUnload & Back Warning Handlers
+    this.setupRefreshGuards();
+
+    // Check if the page load was triggered by a browser refresh/reload
+    let isPageReload = false;
+    try {
+      if (sessionStorage.getItem('tc_reloaded') === '1') {
+        isPageReload = true;
+        sessionStorage.removeItem('tc_reloaded');
+      }
+      const navEntries = performance.getEntriesByType('navigation');
+      if (navEntries && navEntries.length > 0 && navEntries[0].type === 'reload') {
+        isPageReload = true;
+      } else if (performance.navigation && performance.navigation.type === 1) {
+        isPageReload = true;
+      }
+    } catch (e) {}
+
+    // Reset previous stored session so page refresh returns cleanly and resets to initial start
+    firebaseService.clearStoredTeamSession();
+    localStorage.removeItem('tc_active_admin_session');
+    this.state.sessionCode = null;
+    this.state.teamNumber = null;
+
+    if (isPageReload) {
+      // Clear URL query parameters on refresh so it strictly returns to clean initial start
       try {
-        if (typeof window !== 'undefined' && window.location && window.location.search) {
-          const urlParams = new URLSearchParams(window.location.search);
-          const rawCode = urlParams.get('session');
-          if (rawCode) urlCode = rawCode.trim().toUpperCase();
+        if (typeof window !== 'undefined' && window.history && window.location) {
+          window.history.replaceState({}, document.title, window.location.pathname);
         }
       } catch (e) {}
 
-      if (urlCode) {
-        this.state.sessionCode = urlCode;
-        this.navigate('register', { sessionCode: urlCode });
-      } else {
-        this.navigate('home');
+      // Otomatis ke reset ulang di awal dan kembali ke dashboard
+      this.navigate('admin');
+      setTimeout(() => {
+        toast.info('Halaman dimuat ulang: Sesi permainan telah direset ulang ke awal di Dashboard.');
+      }, 400);
+      return;
+    }
+
+    // Check if session code was passed in URL (e.g. ?session=TC1234) on initial fresh load
+    let urlCode = null;
+    try {
+      if (typeof window !== 'undefined' && window.location && window.location.search) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawCode = urlParams.get('session');
+        if (rawCode) urlCode = rawCode.trim().toUpperCase();
       }
+    } catch (e) {}
+
+    if (urlCode) {
+      this.state.sessionCode = urlCode;
+      this.navigate('register', { sessionCode: urlCode });
+    } else {
+      // Otomatis berada di Dashboard saat user membuka link web
+      this.navigate('admin');
     }
   }
 
-  async reconnectSession(sessionCode, teamNumber) {
-    try {
-      const session = await firebaseService.getSession(sessionCode);
-      if (session) {
-        this.routeByPhase(session.currentPhase || 'LOBBY');
-        return;
-      }
-    } catch (e) {
-      console.warn('Reconnect error:', e);
+  shouldWarnOnRefresh() {
+    if (this.currentRoute && this.currentRoute !== 'home' && this.currentRoute !== 'admin') {
+      return true;
     }
-    // Fallback if session no longer exists
+    if (this.state.sessionCode || this.state.teamNumber) {
+      return true;
+    }
+    return false;
+  }
+
+  async resetToHome() {
+    networkService.stopHeartbeat();
+    const isStudent = Boolean(this.state.sessionCode && this.state.teamNumber);
+    if (isStudent) {
+      try {
+        await firebaseService.leaveSession(this.state.sessionCode, this.state.teamNumber);
+      } catch (e) {}
+    }
     firebaseService.clearStoredTeamSession();
-    this.navigate('home');
+    localStorage.removeItem('tc_active_admin_session');
+    this.state.sessionCode = null;
+    this.state.teamNumber = null;
+
+    // Clean URL query params if any
+    try {
+      if (typeof window !== 'undefined' && window.history && window.location) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (e) {}
+
+    if (isStudent) {
+      this.navigate('home');
+    } else {
+      this.navigate('admin');
+    }
+  }
+
+  setupRefreshGuards() {
+    // 1. Native browser beforeunload warning (browser reload button, tab close, pull refresh)
+    window.addEventListener('beforeunload', (e) => {
+      try {
+        sessionStorage.setItem('tc_reloaded', '1');
+      } catch (err) {}
+      if (this.shouldWarnOnRefresh()) {
+        e.preventDefault();
+        const msg = 'Data sesi dan progres permainan akan direset dan kembali ke Dashboard awal jika dimuat ulang.';
+        e.returnValue = msg;
+        return msg;
+      }
+    });
+
+    // 2. On actual unload / pagehide: release slot and clear stored session
+    window.addEventListener('pagehide', () => {
+      try {
+        sessionStorage.setItem('tc_reloaded', '1');
+      } catch (err) {}
+      if (this.shouldWarnOnRefresh()) {
+        if (this.state.sessionCode && this.state.teamNumber) {
+          firebaseService.leaveSession(this.state.sessionCode, this.state.teamNumber);
+        }
+        firebaseService.clearStoredTeamSession();
+        localStorage.removeItem('tc_active_admin_session');
+      }
+    });
+
+    // 3. Intercept Keyboard Refresh (F5, Ctrl+R, Cmd+R)
+    window.addEventListener('keydown', (e) => {
+      if (
+        e.key === 'F5' ||
+        ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))
+      ) {
+        if (this.shouldWarnOnRefresh()) {
+          e.preventDefault();
+          audio.playClick();
+          showLabModal({
+            title: 'PERINGATAN REFRESH HALAMAN',
+            contentHtml: `
+              <div style="font-size:0.95rem; color:#f1f5f9; line-height:1.6;">
+                <p style="margin-bottom:0.75rem;">
+                  Apakah Anda yakin ingin memuat ulang halaman web?
+                </p>
+                <div style="background:rgba(239, 68, 68, 0.15); border-left:3px solid #ef4444; padding:0.85rem 1rem; border-radius:8px; font-size:0.88rem; color:#fca5a5; line-height:1.5;">
+                  ⚠️ <strong>Perhatian:</strong> Jika direfresh, seluruh data sesi permainan Anda akan <strong>direset</strong> dan kembali ke <strong>awal di Dashboard</strong>.
+                </div>
+              </div>
+            `,
+            confirmText: 'Ya, Reset & Ke Dashboard',
+            cancelText: 'Batal (Tetap Bermain)',
+            onConfirm: async () => {
+              toast.info('Mereset permainan ke dashboard awal...');
+              await this.resetToHome();
+            }
+          });
+        }
+      }
+    });
+
+    // 4. Intercept Mobile / Android Back Button & Navigation
+    window.addEventListener('popstate', () => {
+      if (this.shouldWarnOnRefresh()) {
+        // Prevent accidental back navigation by pushing current state back
+        try {
+          history.pushState(null, document.title, window.location.href);
+        } catch (e) {}
+
+        audio.playClick();
+        showLabModal({
+          title: 'PERINGATAN KELUAR KE DASHBOARD',
+          contentHtml: `
+            <div style="font-size:0.95rem; color:#f1f5f9; line-height:1.6;">
+              <p style="margin-bottom:0.75rem;">
+                Apakah Anda yakin ingin keluar dari sesi permainan?
+              </p>
+              <div style="background:rgba(239, 68, 68, 0.15); border-left:3px solid #ef4444; padding:0.85rem 1rem; border-radius:8px; font-size:0.88rem; color:#fca5a5; line-height:1.5;">
+                ⚠️ <strong>Perhatian:</strong> Jika keluar, seluruh data sesi permainan Anda akan <strong>direset</strong> dan kembali ke <strong>awal di Dashboard</strong>.
+              </div>
+            </div>
+          `,
+          confirmText: 'Ya, Reset & Ke Dashboard',
+          cancelText: 'Batal (Tetap Bermain)',
+          onConfirm: async () => {
+            toast.info('Mereset permainan ke dashboard awal...');
+            await this.resetToHome();
+          }
+        });
+      }
+    });
   }
 
   routeByPhase(phase) {
+    audio.playPhaseTransition();
+    const phaseNames = {
+      'LOBBY': 'Lobi Persiapan',
+      'GAME1': 'Game 1: Number Chains',
+      'GAME2': 'Game 2: Start Champ',
+      'GAME3': 'Game 3: Cryptarithm War',
+      'FINISHED': 'Klasemen Akhir (Leaderboard)'
+    };
+    const title = phaseNames[phase] || phase;
+    toast.info(`Beralih serentak ke fase: ${title}`);
+
     switch (phase) {
       case 'LOBBY':
         this.navigate('waiting');
@@ -104,6 +266,13 @@ class ChampionsOfCalorApp {
     this.currentRoute = route;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
+    // Track navigation in browser history for mobile back gesture interception
+    try {
+      if (route !== 'home') {
+        history.pushState({ route }, document.title, window.location.href);
+      }
+    } catch (e) {}
+
     switch (route) {
       case 'home':
         this.currentViewInstance = renderHomeView(this.appContainer, {
@@ -120,10 +289,14 @@ class ChampionsOfCalorApp {
       case 'register':
         this.currentViewInstance = renderRegisterView(this.appContainer, {
           sessionCode: params.sessionCode || this.state.sessionCode,
-          onRegistered: (code, num) => {
+          onRegistered: (code, num, currentPhase) => {
             this.state.sessionCode = code;
             this.state.teamNumber = num;
-            this.navigate('waiting');
+            if (currentPhase && currentPhase !== 'LOBBY') {
+              this.routeByPhase(currentPhase);
+            } else {
+              this.navigate('waiting');
+            }
           },
           onBack: () => {
             this.navigate('home');
@@ -157,8 +330,12 @@ class ChampionsOfCalorApp {
         this.currentViewInstance = renderGame1View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
+          onResetToHome: () => this.resetToHome(),
+          onNextGame: () => {
+            this.navigate('game2');
+          },
           onGameCompleted: () => {
-            // Wait for teacher's phase command to move to game 2
+            // Completed Game 1
           },
           onPhaseChange: (newPhase) => {
             this.routeByPhase(newPhase);
@@ -170,8 +347,12 @@ class ChampionsOfCalorApp {
         this.currentViewInstance = renderGame2View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
+          onResetToHome: () => this.resetToHome(),
+          onNextGame: () => {
+            this.navigate('game3');
+          },
           onGameCompleted: () => {
-            // Wait for teacher's phase command to move to game 3
+            // Completed Game 2
           },
           onPhaseChange: (newPhase) => {
             this.routeByPhase(newPhase);
@@ -183,8 +364,12 @@ class ChampionsOfCalorApp {
         this.currentViewInstance = renderGame3View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
+          onResetToHome: () => this.resetToHome(),
+          onNextGame: () => {
+            this.navigate('leaderboard');
+          },
           onGameCompleted: () => {
-            // Wait for teacher to open leaderboard
+            // Completed Game 3
           },
           onPhaseChange: (newPhase) => {
             this.routeByPhase(newPhase);
@@ -197,10 +382,10 @@ class ChampionsOfCalorApp {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
           onHome: () => {
-            firebaseService.clearStoredTeamSession();
-            this.state.sessionCode = null;
-            this.state.teamNumber = null;
-            this.navigate('home');
+            this.resetToHome();
+          },
+          onPhaseChange: (newPhase) => {
+            this.routeByPhase(newPhase);
           }
         });
         break;
@@ -211,8 +396,14 @@ class ChampionsOfCalorApp {
   }
 }
 
-// Bootstrap application on DOM load
-window.addEventListener('DOMContentLoaded', () => {
+// Bootstrap application safely (handles both fast-load and DOMContentLoaded)
+function startApp() {
   const app = new ChampionsOfCalorApp();
   app.init();
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', startApp);
+} else {
+  startApp();
+}

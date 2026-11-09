@@ -7,6 +7,7 @@ import { firebaseService } from '../services/firebase-service.js';
 import { audio } from '../services/audio-service.js';
 import { showLabModal } from '../components/modal.js';
 import { toast } from '../components/notification.js';
+import { networkService } from '../services/network-service.js';
 
 export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseChange, onCancel }) {
   let unsubscribe = null;
@@ -14,11 +15,14 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
   container.innerHTML = `
     <div class="tc-view tc-waiting-view">
       <!-- Top Action Bar -->
-      <div class="tc-top-bar" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+      <div class="tc-top-bar" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
         <button id="btn-cancel-waiting-top" class="tc-btn tc-btn-ghost danger" type="button" title="Keluar dan ganti kelompok">
           ← Batalkan & Ganti Kelompok
         </button>
-        <div class="tc-session-tag">KODE SESI: <strong>${sessionCode}</strong></div>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div id="student-net-badge-wrap"></div>
+          <div class="tc-session-tag">KODE SESI: <strong>${sessionCode}</strong></div>
+        </div>
       </div>
 
       <!-- Top Status Banner -->
@@ -84,6 +88,11 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
     </div>
   `;
 
+  // Attach Network Health Badge & Start Team Heartbeat
+  const netBadgeWrap = container.querySelector('#student-net-badge-wrap');
+  const detachNet = netBadgeWrap ? networkService.attachBadge(netBadgeWrap) : () => {};
+  networkService.startHeartbeat(sessionCode, teamNumber);
+
   // Handle Cancel Action
   const handleCancelClick = () => {
     audio.playClick();
@@ -103,6 +112,7 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
       cancelText: 'Tetap Menunggu',
       onConfirm: async () => {
         try {
+          networkService.stopHeartbeat();
           if (unsubscribe) {
             unsubscribe();
             unsubscribe = null;
@@ -144,6 +154,14 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
 
     // Update My Team Profile
     const myTeam = session.teams ? session.teams[`team_${teamNumber}`] : null;
+    if (session.teams && (!myTeam || !myTeam.claimed)) {
+      networkService.stopHeartbeat();
+      toast.warning(`Slot Kelompok ${teamNumber} telah dikosongkan atau direset oleh Guru.`);
+      if (unsubscribe) unsubscribe();
+      if (onCancel) onCancel();
+      return;
+    }
+
     if (myTeam) {
       const nameEl = container.querySelector('#my-team-name-display');
       const membersEl = container.querySelector('#my-team-members-display');
@@ -180,6 +198,7 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
   return {
     destroy: () => {
       if (unsubscribe) unsubscribe();
+      if (detachNet) detachNet();
     }
   };
 }

@@ -1,67 +1,143 @@
 /**
- * THERMO CHAMPIONS: HEAT EDITION
- * Responsive Styles - Mobile, Tablet, & Desktop Optimizations
+ * GAME KALOR: CLASH OF SCIENCE
+ * Comprehensive Responsive Stylesheet - Mobile, Tablet, & Desktop
  */
 
-/* Small Tablets & Large Phones (max-width: 768px) */
+/* =========================================
+   LARGE SCREENS & LAPTOPS (Desktop Default)
+   ========================================= */
+.tc-view {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem 3.5rem 1.25rem;
+}
+
+/* =========================================
+   TABLETS & MEDIUM SCREENS (max-width: 1024px)
+   ========================================= */
+@media (max-width: 1024px) {
+  .tc-view {
+    padding: 1.25rem 1rem 3rem 1rem;
+  }
+
+  .tc-role-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  .tc-matching-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .tc-admin-teams-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+
+  .tc-podium-container {
+    min-height: 250px;
+    gap: 1rem;
+  }
+}
+
+/* =========================================
+   MOBILE PHONES & SMALL TABLETS (max-width: 768px)
+   ========================================= */
 @media (max-width: 768px) {
   .tc-view {
-    padding: 1rem 0.75rem 2.5rem 0.75rem;
+    padding: 0.85rem 0.75rem 2.5rem 0.75rem;
+  }
+
+  /* Audio Button Position on Mobile */
+  .tc-audio-btn {
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 38px;
+    height: 38px;
+    font-size: 0.95rem;
+  }
+
+  /* Home View Mobile */
+  .tc-home-header {
+    margin-top: 1rem;
+    margin-bottom: 1.75rem;
   }
 
   .tc-main-title {
-    font-size: 2rem;
+    font-size: 2.1rem;
+    line-height: 1.15;
+  }
+
+  .tc-sub-title {
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
   }
 
   .tc-home-desc {
-    font-size: 0.95rem;
+    font-size: 0.92rem;
+    line-height: 1.5;
   }
 
   .tc-role-grid {
     grid-template-columns: 1fr;
     gap: 1.25rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .tc-role-card {
+    padding: 1.75rem 1.25rem;
+  }
+
+  .tc-role-name {
+    font-size: 1.4rem;
+  }
+
+  .tc-role-info {
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
   }
 
   .tc-preview-bar {
     grid-template-columns: 1fr;
-  }
-
-  .tc-my-team-card {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .tc-my-team-actions {
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding-top: 0.85rem;
-    margin-top: 0.25rem;
-  }
-
-  .tc-waiting-cancel-box {
-    flex-direction: column;
-    align-items: stretch;
-    text-align: center;
     gap: 0.75rem;
+    padding: 1rem;
   }
 
-  .tc-cancel-hint {
-    justify-content: center;
+  .tc-preview-item {
+    padding: 0.65rem 0.75rem;
   }
 
-  .tc-cancel-link-btn {
-    width: 100%;
-    justify-content: center;
-    padding: 0.5rem;
+  /* Top Navigation Bar */
+  .tc-top-bar {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 1rem !important;
+  }
+
+  .tc-session-tag {
+    font-size: 0.82rem;
+    padding: 0.35rem 0.75rem;
+  }
+
+  /* Register View Mobile */
+  .tc-reg-card {
+    padding: 1.25rem 1rem;
+  }
+
+  .tc-card-title {
+    font-size: 1.35rem;
+  }
+
+  .tc-card-subtitle {
+    font-size: 0.85rem;
   }
 
   .tc-team-selector {
     grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
+    gap: 0.45rem;
   }
 
   .tc-team-num-btn {
@@ -77,129 +153,514 @@
   }
 
   .tc-member-row {
-    grid-template-columns: 1fr 80px 38px;
+    grid-template-columns: 1fr 75px 36px;
     gap: 0.35rem;
   }
 
+  .tc-input-member-name,
+  .tc-input-member-absen {
+    font-size: 0.88rem;
+    padding: 0.6rem 0.65rem;
+  }
+
+  .tc-btn-remove-member {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+  }
+
+  /* Waiting View Mobile */
+  .tc-waiting-header {
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-waiting-title {
+    font-size: 1.65rem;
+  }
+
+  .tc-my-team-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 1.25rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-my-team-actions {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 0.75rem;
+    margin-top: 0.25rem;
+  }
+
+  .tc-sync-notice {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-waiting-cancel-box {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-cancel-hint {
+    justify-content: center;
+    font-size: 0.85rem;
+  }
+
+  .tc-cancel-link-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.6rem;
+  }
+
+  .tc-lobby-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+  }
+
+  /* Game HUD Mobile */
   .tc-game-hud {
     flex-direction: column;
     text-align: center;
     gap: 0.75rem;
     padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .tc-hud-badge {
+    align-items: center;
+    text-align: center;
+  }
+
+  .tc-hud-title {
+    font-size: 1.1rem;
   }
 
   .tc-hud-team {
-    text-align: center;
     align-items: center;
+    text-align: center;
   }
 
-  .tc-memorize-grid {
+  .tc-hud-team-actions {
+    justify-content: center;
+  }
+
+  .tc-banner-instruction {
+    font-size: 0.88rem;
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 1.25rem;
+  }
+
+  /* Game 1: Number Chains Mobile */
+  .tc-chain-stage-header {
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-chain-title {
+    font-size: 1.35rem;
+  }
+
+  .tc-chain-story {
+    font-size: 0.88rem;
+  }
+
+  .tc-chain-hint-box {
+    font-size: 0.82rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .tc-chain-howto-pill {
+    font-size: 0.8rem;
+    padding: 0.45rem 0.85rem;
+    gap: 0.4rem;
+  }
+
+  .tc-chain-list {
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .tc-chain-card {
+    padding: 1rem 1rem;
+  }
+
+  .tc-card-desc {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+  }
+
+  .tc-card-input-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+  }
+
+  .tc-btn-group-nums {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .tc-num-choice-btn {
+    flex: 1;
+    max-width: 54px;
+    height: 42px;
+    font-size: 1.05rem;
+  }
+
+  .tc-chain-preview-box {
+    padding: 1rem 1rem;
+  }
+
+  .tc-preview-step-row {
+    font-size: 0.85rem;
+    gap: 0.5rem;
+  }
+
+  /* Game 2: Start Champ Mobile */
+  .tc-matching-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
+    margin-bottom: 1.5rem;
   }
 
-  .tc-ch-options-grid {
-    grid-template-columns: 1fr;
+  .tc-match-card {
+    padding: 1rem;
   }
 
-  .tc-opt-btn {
-    padding: 0.75rem 0.85rem;
+  .tc-match-svg-wrap {
+    height: 125px;
+    margin-bottom: 0.75rem;
+  }
+
+  .tc-match-title {
+    font-size: 1.05rem;
+  }
+
+  .tc-match-desc {
     font-size: 0.85rem;
+    margin-bottom: 1rem;
   }
 
-  .tc-sticky-submit-bar {
-    flex-direction: column;
-    text-align: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
+  .tc-options-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
   }
 
-  .tc-scramble-board {
-    padding: 1.5rem 1rem;
+  .tc-option-btn {
+    font-size: 0.82rem;
+    padding: 0.65rem 0.45rem;
   }
 
-  .tc-slot-box {
-    width: 42px;
+  /* Game 3: Cryptarithm War Mobile */
+  .tc-crypto-card {
+    padding: 1.25rem 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .tc-crypto-title {
+    font-size: 1.3rem;
+  }
+
+  .tc-crypto-story {
+    font-size: 0.88rem;
+  }
+
+  .tc-givens-grid {
+    gap: 0.45rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-given-chip {
+    font-size: 0.82rem;
+    padding: 0.35rem 0.65rem;
+  }
+
+  .tc-equation-box {
+    padding: 1rem 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-equation-text {
+    font-size: 1.05rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .tc-inputs-row {
+    gap: 0.85rem;
+  }
+
+  .tc-crypto-input-slot {
+    width: 78px;
     height: 48px;
     font-size: 1.35rem;
   }
 
-  .tc-letter-tile {
-    width: 42px;
+  .tc-numpad-wrap {
+    max-width: 290px;
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-numpad-grid {
+    gap: 0.45rem;
+  }
+
+  .tc-numpad-btn {
     height: 48px;
-    font-size: 1.25rem;
+    font-size: 1.2rem;
   }
 
-  .tc-lab-station-card {
-    padding: 1.5rem 1rem;
+  .tc-scratchpad-toggle {
+    bottom: 16px;
+    right: 16px;
+    padding: 0.6rem 1rem;
+    font-size: 0.82rem;
   }
 
-  .tc-parameters-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .tc-scratchpad-drawer {
+    padding: 1rem;
+    max-height: 85vh;
   }
 
-  .tc-input-calc {
-    font-size: 1.15rem;
-    padding-right: 90px;
+  .tc-scratch-canvas {
+    height: 230px;
   }
 
-  .tc-unit-addon {
-    font-size: 0.75rem;
-    right: 10px;
-    padding: 0.25rem 0.5rem;
+  /* Leaderboard Mobile */
+  .tc-lb-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .tc-lb-title {
+    font-size: 2rem;
   }
 
   .tc-podium-container {
     gap: 0.5rem;
-    min-height: 240px;
+    min-height: 220px;
+    margin-bottom: 1.5rem;
   }
 
-  .tc-podium-pedestal.p1 { height: 120px; font-size: 1.4rem; }
-  .tc-podium-pedestal.p2 { height: 90px; font-size: 1.3rem; }
-  .tc-podium-pedestal.p3 { height: 65px; font-size: 1.2rem; }
+  .tc-podium-pedestal.p1 { height: 110px; font-size: 1.35rem; }
+  .tc-podium-pedestal.p2 { height: 85px; font-size: 1.2rem; }
+  .tc-podium-pedestal.p3 { height: 60px; font-size: 1.1rem; }
 
-  .tc-podium-medal { font-size: 2rem; }
-  .tc-podium-name { font-size: 0.9rem; max-width: 95px; }
-  .tc-podium-score { font-size: 1rem; }
-  .tc-podium-score.gold { font-size: 1.15rem; }
+  .tc-podium-medal { font-size: 1.8rem; }
+  .tc-podium-name { font-size: 0.85rem; max-width: 85px; }
+  .tc-podium-score { font-size: 0.95rem; }
+  .tc-podium-score.gold { font-size: 1.1rem; }
 
+  .tc-table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tc-lb-table {
+    min-width: 640px;
+  }
+
+  .tc-legend-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  /* Admin Cockpit Mobile */
   .tc-cockpit-header {
     flex-direction: column;
     align-items: stretch;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .tc-cockpit-title {
+    font-size: 1.35rem;
   }
 
   .tc-cockpit-session-box {
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .tc-code-btn-group {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .tc-code-btn-group .tc-btn {
+    flex: 1;
+    min-width: 80px;
   }
 
   .tc-phase-btn-row {
     grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .tc-btn-phase {
+    padding: 0.75rem 1rem;
+    font-size: 0.88rem;
+  }
+
+  .tc-admin-tools-row {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .tc-admin-tools-row .tc-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tc-admin-teams-grid {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .tc-atc-scores {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.35rem;
+  }
+
+  .tc-sc-val {
+    font-size: 1.1rem;
+  }
+
+  /* Toast Notification Container on Mobile */
+  .tc-toast-container {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    align-items: center;
+  }
+
+  .tc-toast {
+    max-width: 100%;
+    width: 100%;
+    font-size: 0.85rem;
+    padding: 0.75rem 1rem;
+  }
+
+  /* Modal Dialog Mobile */
+  .tc-modal-overlay {
+    padding: 0.75rem;
+  }
+
+  .tc-modal-card {
+    padding: 1.25rem 1rem;
+    max-width: 95vw;
+    max-height: 90vh;
+  }
+
+  .tc-modal-title {
+    font-size: 1.15rem;
+  }
+
+  .tc-modal-footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+
+  .tc-modal-footer .tc-btn {
+    width: 100%;
   }
 }
 
-/* Extra Small Phones (max-width: 480px) */
+/* =========================================
+   EXTRA SMALL PHONES (max-width: 480px)
+   ========================================= */
 @media (max-width: 480px) {
   .tc-main-title {
     font-size: 1.7rem;
   }
 
   .tc-team-selector {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.35rem;
   }
 
-  .tc-slot-box {
-    width: 36px;
-    height: 42px;
-    font-size: 1.15rem;
-  }
-
-  .tc-letter-tile {
-    width: 36px;
-    height: 42px;
+  .tc-num-val {
     font-size: 1.1rem;
   }
 
-  .tc-parameters-grid {
+  .tc-num-status {
+    font-size: 0.55rem;
+  }
+
+  .tc-member-row {
+    grid-template-columns: 1fr 65px 32px;
+    gap: 0.25rem;
+  }
+
+  .tc-input-member-name,
+  .tc-input-member-absen {
+    font-size: 0.82rem;
+    padding: 0.5rem 0.55rem;
+  }
+
+  .tc-lobby-grid {
     grid-template-columns: 1fr;
+  }
+
+  .tc-chain-card {
+    padding: 0.85rem 0.75rem;
+  }
+
+  .tc-card-desc {
+    font-size: 0.88rem;
+  }
+
+  .tc-num-choice-btn {
+    height: 38px;
+    font-size: 0.95rem;
+  }
+
+  .tc-options-grid {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+
+  .tc-option-btn {
+    font-size: 0.82rem;
+    padding: 0.6rem 0.45rem;
+  }
+
+  .tc-crypto-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .tc-crypto-formula-pill {
+    font-size: 0.85rem;
+  }
+
+  .tc-crypto-input-slot {
+    width: 68px;
+    height: 44px;
+    font-size: 1.2rem;
+  }
+
+  .tc-numpad-wrap {
+    max-width: 250px;
+  }
+
+  .tc-numpad-btn {
+    height: 44px;
+    font-size: 1.1rem;
   }
 }

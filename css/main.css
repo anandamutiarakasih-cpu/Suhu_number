@@ -50,6 +50,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html, body {
+  overscroll-behavior-y: contain;
+}
+
 body {
   font-family: var(--font-main);
   background-color: var(--tc-dark);

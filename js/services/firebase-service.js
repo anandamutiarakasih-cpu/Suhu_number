@@ -17,6 +17,7 @@ class FirebaseService {
     this.serverTimeOffset = 0;
     this.broadcast = null;
     this.listeners = new Map();
+    this.activeSubscriptions = new Map();
     this.activeSSE = new Map();
     this.sessionsCache = new Map();
 
@@ -50,7 +51,15 @@ class FirebaseService {
         this.fbRef = (db, path) => db.ref(path);
         this.fbSet = (ref, val) => ref.set(val);
         this.fbUpdate = (ref, val) => ref.update(val);
-        this.fbOnValue = (ref, cb) => ref.on('value', cb);
+        this.fbOnValue = (ref, cb) => {
+          if (typeof ref.on === 'function') {
+            ref.on('value', cb);
+            return () => {
+              try { ref.off('value', cb); } catch (e) {}
+            };
+          }
+          return () => {};
+        };
         this.fbGet = (ref) => (ref.get ? ref.get() : ref.once('value'));
         this.isFirebaseReady = true;
         this.isOnline = true;
@@ -81,7 +90,7 @@ class FirebaseService {
       this.app = initializeApp(firebaseConfig);
       this.db = firebaseConfig.databaseURL ? getDatabase(this.app, firebaseConfig.databaseURL) : getDatabase(this.app);
       this.fbRef = ref;
-      this.fbOnValue = onValue;
+      this.fbOnValue = (r, cb) => onValue(r, cb);
       this.fbSet = set;
       this.fbUpdate = update;
       this.fbGet = get;
@@ -287,8 +296,8 @@ class FirebaseService {
       throw new Error(`Sesi dengan kode ${sessionCode} tidak ditemukan.`);
     }
 
-    if (session.status !== 'LOBBY') {
-      throw new Error('Permainan sudah dimulai atau sedang berjalan.');
+    if (session.status === 'FINISHED') {
+      throw new Error('Sesi permainan ini sudah selesai.');
     }
 
     if (session.teams && session.teams[`team_${num}`] && session.teams[`team_${num}`].claimed) {
@@ -336,7 +345,7 @@ class FirebaseService {
     this.notifySessionUpdate(sessionCode, session);
     this.saveTeamSession(sessionCode, num, teamName);
 
-    return { success: true, teamNumber: num, sessionCode };
+    return { success: true, teamNumber: num, sessionCode, currentPhase: session.currentPhase || 'LOBBY' };
   }
 
   /**
@@ -414,6 +423,7 @@ class FirebaseService {
     session.currentPhase = phase;
     session.phaseStartTime = this.getServerTime();
     session.phaseDuration = duration;
+    session.updatedAt = this.getServerTime();
 
     this.sessionsCache.set(sessionCode, session);
 
@@ -425,7 +435,8 @@ class FirebaseService {
           status: phase,
           currentPhase: phase,
           phaseStartTime: session.phaseStartTime,
-          phaseDuration: duration
+          phaseDuration: duration,
+          updatedAt: session.updatedAt
         });
         if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {}
@@ -433,6 +444,30 @@ class FirebaseService {
 
     this.notifySessionUpdate(sessionCode, session);
     return session;
+  }
+
+  /**
+   * SEND TEAM HEARTBEAT & LATENCY TO TEACHER
+   */
+  sendHeartbeat(sessionCode, teamNumber, latency = 0) {
+    if (!sessionCode || !teamNumber) return;
+    const now = this.getServerTime();
+
+    const session = this.sessionsCache.get(sessionCode);
+    if (session?.teams?.[`team_${teamNumber}`]) {
+      session.teams[`team_${teamNumber}`].lastActive = now;
+      session.teams[`team_${teamNumber}`].latency = latency;
+    }
+
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
+      try {
+        const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${teamNumber}`);
+        this.fbUpdate(teamRef, {
+          lastActive: now,
+          latency: latency
+        }).catch(() => {});
+      } catch (e) {}
+    }
   }
 
   /**
@@ -699,30 +734,49 @@ class FirebaseService {
     }
     this.listeners.get(cleanCode).add(callback);
 
-    // Initial load
-    this.getSession(cleanCode).then((s) => {
-      if (s) callback(s);
-    });
-
-    // 1. Firebase Live Listener
-    if (this.isFirebaseReady && this.db && this.fbRef && this.fbOnValue) {
-      try {
-        const sRef = this.fbRef(this.db, `sessions/${cleanCode}`);
-        this.fbOnValue(sRef, (snap) => {
-          const val = typeof snap.val === 'function' ? snap.val() : null;
-          if (val) {
-            this.notifySessionUpdate(cleanCode, val);
-          }
-        });
-      } catch (e) {}
+    // Initial immediate response from cache or local
+    const current = this.sessionsCache.get(cleanCode) || this.getLocalSession(cleanCode);
+    if (current) {
+      try { callback(current); } catch (e) {}
     }
 
-    // 2. Global Cloud Relay SSE Listener
-    const cleanupSSE = this.listenToCloudRelay(cleanCode, (data) => {
-      if (this.listeners.has(cleanCode)) {
-        this.listeners.get(cleanCode).forEach((cb) => cb(data));
+    this.getSession(cleanCode).then((s) => {
+      if (s) {
+        try { callback(s); } catch (e) {}
       }
     });
+
+    // 1. Single Live Firebase Listener per sessionCode
+    if (!this.activeSubscriptions.has(cleanCode)) {
+      let fbUnsub = null;
+      if (this.isFirebaseReady && this.db && this.fbRef && this.fbOnValue) {
+        try {
+          const sRef = this.fbRef(this.db, `sessions/${cleanCode}`);
+          fbUnsub = this.fbOnValue(sRef, (snap) => {
+            const val = typeof snap.val === 'function' ? snap.val() : null;
+            if (val) {
+              this.notifySessionUpdate(cleanCode, val);
+            }
+          });
+        } catch (e) {}
+      }
+
+      // 2. Global Cloud Relay SSE Listener
+      const cleanupSSE = this.listenToCloudRelay(cleanCode, (data) => {
+        if (data && data.code === cleanCode) {
+          this.notifySessionUpdate(cleanCode, data);
+        }
+      });
+
+      this.activeSubscriptions.set(cleanCode, () => {
+        if (typeof fbUnsub === 'function') {
+          try { fbUnsub(); } catch (e) {}
+        }
+        if (typeof cleanupSSE === 'function') {
+          try { cleanupSSE(); } catch (e) {}
+        }
+      });
+    }
 
     // 3. Storage event for multi-tab
     const storageHandler = (e) => {
@@ -738,8 +792,15 @@ class FirebaseService {
     return () => {
       if (this.listeners.has(cleanCode)) {
         this.listeners.get(cleanCode).delete(callback);
+        if (this.listeners.get(cleanCode).size === 0) {
+          this.listeners.delete(cleanCode);
+          if (this.activeSubscriptions.has(cleanCode)) {
+            const unsub = this.activeSubscriptions.get(cleanCode);
+            if (typeof unsub === 'function') unsub();
+            this.activeSubscriptions.delete(cleanCode);
+          }
+        }
       }
-      if (cleanupSSE) cleanupSSE();
       window.removeEventListener('storage', storageHandler);
     };
   }

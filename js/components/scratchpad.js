@@ -71,8 +71,8 @@ export class Scratchpad {
       } catch (e) {}
     }
 
-    this.canvas.width = rect.width;
-    this.canvas.height = Math.max(rect.height, 260);
+    this.canvas.width = this.canvas.clientWidth || rect.width;
+    this.canvas.height = this.canvas.clientHeight || 260;
 
     if (imgData) {
       try {
@@ -123,9 +123,11 @@ export class Scratchpad {
   }
 
   saveState() {
-    if (!this.ctx || !this.canvas) return;
-    if (this.history.length > 10) this.history.shift();
-    this.history.push(this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height));
+    if (!this.ctx || !this.canvas || this.canvas.width <= 0 || this.canvas.height <= 0) return;
+    try {
+      if (this.history.length > 10) this.history.shift();
+      this.history.push(this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height));
+    } catch (e) {}
   }
 
   undo() {

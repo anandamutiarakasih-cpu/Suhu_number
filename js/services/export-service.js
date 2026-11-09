@@ -28,10 +28,10 @@ export function exportSessionToCSV(sessionCode, sessionData) {
     'Nama Kelompok',
     'Jumlah Anggota',
     'Daftar Anggota (Nama & Absen)',
-    'Skor Game 1 (Shuffle & Recall)',
-    'Skor Game 2 (Word Scramble)',
-    'Skor Game 3 (Extreme Addition)',
-    'Total Skor',
+    'Skor Game 1 (Number Chains - Maks 30)',
+    'Skor Game 2 (Start Champ - Maks 35)',
+    'Skor Game 3 (Cryptarithm War - Maks 35)',
+    'Total Skor (Maks 100)',
     'Predikat',
     'Status'
   ];

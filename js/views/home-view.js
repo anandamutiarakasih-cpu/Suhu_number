@@ -139,4 +139,8 @@ export function renderHomeView(container, { onJoinTeam, onOpenAdmin }) {
     audio.playClick();
     if (onOpenAdmin) onOpenAdmin();
   });
+
+  return {
+    destroy: () => {}
+  };
 }

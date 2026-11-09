@@ -98,6 +98,21 @@ class AudioService {
     }, 120);
   }
 
+  playWarningPing() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    this.playTone(330, 'sawtooth', 0.15, 0.15, 0.08);
+  }
+
+  playConnectedTone() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    this.playTone(523, 'sine', 0.08, 0.1, 0.04);
+    setTimeout(() => this.playTone(784, 'sine', 0.12, 0.1, 0.05), 70);
+  }
+
   playPhaseTransition() {
     if (this.muted) return;
     this.init();

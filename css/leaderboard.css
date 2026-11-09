@@ -229,6 +229,10 @@
   color: var(--tc-yellow);
 }
 
+.tc-col-pred {
+  text-align: center;
+}
+
 .tc-pred-pill {
   display: inline-flex;
   align-items: center;

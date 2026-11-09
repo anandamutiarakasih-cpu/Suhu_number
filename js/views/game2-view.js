@@ -10,8 +10,9 @@ import { firebaseService } from '../services/firebase-service.js';
 import { audio } from '../services/audio-service.js';
 import { toast } from '../components/notification.js';
 import { showLabModal } from '../components/modal.js';
+import { networkService } from '../services/network-service.js';
 
-export function renderGame2View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange }) {
+export function renderGame2View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
   const ROUND_SIZE = 4;
   const TOTAL_ROUNDS = Math.ceil(START_CHAMP_DATA.length / ROUND_SIZE); // 3 rounds
   let currentRound = 0;
@@ -20,11 +21,16 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
   let sessionUnsubscribe = null;
   let totalCorrectMatches = 0;
   let isChecking = false;
+  let detachNet = null;
+  let countdownTimer = null;
 
-  // Realtime Session Listener
+  // Ensure heartbeat is alive
+  networkService.startHeartbeat(sessionCode, teamNumber);
+
+  // Realtime Session Listener (only force exit if teacher resets to LOBBY or forces FINISHED)
   sessionUnsubscribe = firebaseService.listenToSession(sessionCode, (session) => {
     if (!session) return;
-    if (session.currentPhase && session.currentPhase !== 'GAME2') {
+    if (session.currentPhase === 'LOBBY' || session.currentPhase === 'FINISHED') {
       cleanup();
       if (onPhaseChange) onPhaseChange(session.currentPhase, session);
     }
@@ -59,7 +65,13 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
           </div>
 
           <div class="tc-hud-team">
-            <span class="tc-hud-team-tag">KELOMPOK ${teamNumber}</span>
+            <div class="tc-hud-team-actions">
+              <div id="game-net-badge-wrap"></div>
+              <span class="tc-hud-team-tag">KELOMPOK ${teamNumber}</span>
+              <button type="button" class="tc-btn-hud-reset" id="btn-hud-reset" title="Keluar & Reset ke Dashboard">
+                🔄 Ke Dashboard
+              </button>
+            </div>
             <span class="tc-hud-score-tag">TARGET: 35 PTS</span>
           </div>
         </div>
@@ -124,6 +136,38 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
     });
 
     attachInteractions(roundItems);
+
+    if (detachNet) detachNet();
+    const netWrap = container.querySelector('#game-net-badge-wrap');
+    if (netWrap) detachNet = networkService.attachBadge(netWrap);
+
+    const btnHudReset = container.querySelector('#btn-hud-reset');
+    if (btnHudReset) {
+      btnHudReset.addEventListener('click', handleResetClick);
+    }
+  }
+
+  function handleResetClick() {
+    audio.playClick();
+    showLabModal({
+      title: 'PERINGATAN RESET KE DASHBOARD',
+      contentHtml: `
+        <div style="font-size:0.95rem; color:#f1f5f9; line-height:1.6;">
+          <p style="margin-bottom:0.75rem;">
+            Apakah Anda yakin ingin keluar dari permainan dan kembali ke Dashboard awal?
+          </p>
+          <div style="background:rgba(239, 68, 68, 0.15); border-left:3px solid #ef4444; padding:0.85rem 1rem; border-radius:8px; font-size:0.88rem; color:#fca5a5; line-height:1.5;">
+            ⚠️ <strong>Perhatian:</strong> Seluruh data sesi dan progres permainan Anda akan <strong>direset</strong> dan kembali ke <strong>Dashboard awal</strong>.
+          </div>
+        </div>
+      `,
+      confirmText: 'Ya, Reset & Ke Dashboard',
+      cancelText: 'Batal (Tetap Bermain)',
+      onConfirm: async () => {
+        cleanup();
+        if (onResetToHome) onResetToHome();
+      }
+    });
   }
 
   function attachInteractions(roundItems) {
@@ -230,34 +274,95 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
   }
 
   async function finishGame2() {
-    cleanup();
+    // Calculate speed bonus based on remaining time fraction
+    const remaining = timerInstance ? timerInstance.getRemainingSeconds() : 0;
+    if (timerInstance) timerInstance.stop();
+
     toast.info('Menyimpan skor Game 2 ke database...');
     try {
-      // Calculate speed bonus based on remaining time fraction
-      const remaining = timerInstance ? timerInstance.getRemainingSeconds() : 0;
       const speedBonus = remaining > 15 ? 5 : Math.round((remaining / 180) * 5 * 10) / 10;
-
       const res = await firebaseService.submitGame2Score(sessionCode, teamNumber, totalCorrectMatches, START_CHAMP_DATA.length, speedBonus);
       audio.playFanfare();
 
       container.innerHTML = `
         <div class="tc-view tc-game-complete-card">
-          <div class="tc-card" style="text-align:center; max-width:580px; margin:3rem auto; padding:3rem 2rem;">
-            <div style="font-size:4rem; margin-bottom:1rem;">⚡</div>
+          <div class="tc-card" style="text-align:center; max-width:580px; margin:2.5rem auto; padding:2.5rem 1.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap; gap:0.5rem;">
+              <div id="complete-net-badge-wrap"></div>
+              <button type="button" class="tc-btn-hud-reset" id="btn-complete-reset" title="Keluar dari sesi permainan">
+                🚪 Keluar Sesi
+              </button>
+            </div>
+            <div style="font-size:3.5rem; margin-bottom:0.75rem;">⚡</div>
             <div class="tc-badge-lab">GAME 2 SELESAI</div>
-            <h2 style="font-size:2rem; margin:0.5rem 0;">Start Champ Berhasil Dituntaskan!</h2>
-            <p style="color:#94a3b8; margin-bottom:1.5rem;">
+            <h2 style="font-size:1.85rem; margin:0.5rem 0;">Start Champ Berhasil Dituntaskan!</h2>
+            <p style="color:#94a3b8; margin-bottom:1rem; font-size:0.95rem;">
               Kelompok ${teamNumber} berhasil mencocokkan ${totalCorrectMatches} dari ${START_CHAMP_DATA.length} peristiwa konsep kalor.
             </p>
             <div style="font-size:2.5rem; font-weight:800; color:var(--tc-orange); margin-bottom:1.5rem; font-family:var(--font-mono);">
               +${res.score} POIN
             </div>
-            <p style="font-size:0.9rem; color:var(--tc-sky);">
-              Menunggu instruksi guru untuk membuka babak Game 3: Cryptarithm War...
-            </p>
+
+            <!-- Auto-progression action buttons -->
+            <div style="margin-top:1.25rem; display:flex; flex-direction:column; gap:0.85rem; align-items:center;">
+              <button type="button" class="tc-btn tc-btn-primary tc-btn-large" id="btn-next-to-game3" style="width:100%; max-width:380px; font-size:1.05rem; padding:1.1rem 1.5rem; box-shadow:0 0 25px rgba(249, 115, 22, 0.45);">
+                <span>LANJUT KE GAME 3: CRYPTARITHM WAR</span>
+                <span class="tc-btn-arrow">➔</span>
+              </button>
+              <div style="font-size:0.9rem; color:#94a3b8;" id="countdown-game3-text">
+                Otomatis lanjut dalam <strong id="countdown-sec" style="color:var(--tc-yellow); font-size:1.1rem;">4</strong> detik...
+              </div>
+              <button type="button" class="tc-btn tc-btn-ghost" id="btn-complete-exit-link" style="font-size:0.85rem; color:#94a3b8; margin-top:0.25rem;">
+                ← Keluar dari Sesi Permainan
+              </button>
+            </div>
           </div>
         </div>
       `;
+
+      if (detachNet) detachNet();
+      const compWrap = container.querySelector('#complete-net-badge-wrap');
+      if (compWrap) detachNet = networkService.attachBadge(compWrap);
+
+      const btnCompReset = container.querySelector('#btn-complete-reset');
+      if (btnCompReset) btnCompReset.addEventListener('click', handleResetClick);
+
+      const btnExitLink = container.querySelector('#btn-complete-exit-link');
+      if (btnExitLink) btnExitLink.addEventListener('click', handleResetClick);
+
+      // Auto progression handler
+      const proceedToGame3 = () => {
+        if (countdownTimer) {
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+        }
+        cleanup();
+        if (onNextGame) {
+          onNextGame();
+        } else if (onPhaseChange) {
+          onPhaseChange('GAME3');
+        }
+      };
+
+      const btnNext = container.querySelector('#btn-next-to-game3');
+      if (btnNext) {
+        btnNext.addEventListener('click', () => {
+          audio.playClick();
+          proceedToGame3();
+        });
+      }
+
+      let secondsLeft = 4;
+      const countEl = container.querySelector('#countdown-sec');
+      countdownTimer = setInterval(() => {
+        secondsLeft--;
+        if (countEl) countEl.textContent = secondsLeft;
+        if (secondsLeft <= 0) {
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+          proceedToGame3();
+        }
+      }, 1000);
 
       if (onGameCompleted) onGameCompleted(res.score);
     } catch (err) {
@@ -266,8 +371,13 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
   }
 
   function cleanup() {
+    if (countdownTimer) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
     if (timerInstance) timerInstance.stop();
     if (sessionUnsubscribe) sessionUnsubscribe();
+    if (detachNet) detachNet();
   }
 
   return {

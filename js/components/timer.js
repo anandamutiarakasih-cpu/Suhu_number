@@ -31,6 +31,7 @@ export class SyncTimer {
   }
 
   render() {
+    if (!this.container) return;
     this.container.innerHTML = `
       <div class="tc-timer-wrap">
         <svg class="tc-timer-svg" viewBox="0 0 100 100">
@@ -50,8 +51,10 @@ export class SyncTimer {
 
     // Circumference = 2 * PI * 42 ~= 263.89
     this.circumference = 2 * Math.PI * 42;
-    this.barEl.style.strokeDasharray = `${this.circumference}`;
-    this.barEl.style.strokeDashoffset = '0';
+    if (this.barEl) {
+      this.barEl.style.strokeDasharray = `${this.circumference}`;
+      this.barEl.style.strokeDashoffset = '0';
+    }
   }
 
   start() {
@@ -60,9 +63,12 @@ export class SyncTimer {
   }
 
   update() {
+    if (!this.barEl || !this.secEl) return;
     const now = this.getServerTime();
-    const elapsedSec = (now - this.startTimeMs) / 1000;
-    const remainingSec = Math.max(0, this.durationSec - elapsedSec);
+    let elapsedSec = (now - this.startTimeMs) / 1000;
+    if (elapsedSec < 0) elapsedSec = 0; // Guard against client clock behind server
+
+    const remainingSec = Math.min(this.durationSec, Math.max(0, this.durationSec - elapsedSec));
     const wholeSec = Math.ceil(remainingSec);
 
     // Audio & tick triggers
@@ -77,8 +83,8 @@ export class SyncTimer {
       if (this.onTick) this.onTick(wholeSec, remainingSec);
     }
 
-    // Update SVG stroke
-    const fraction = remainingSec / this.durationSec;
+    // Update SVG stroke with clamped fraction
+    const fraction = this.durationSec > 0 ? Math.min(1, Math.max(0, remainingSec / this.durationSec)) : 0;
     const offset = this.circumference * (1 - fraction);
     this.barEl.style.strokeDashoffset = `${offset}`;
 
@@ -96,8 +102,8 @@ export class SyncTimer {
 
   getRemainingSeconds() {
     const now = this.getServerTime();
-    const elapsedSec = (now - this.startTimeMs) / 1000;
-    return Math.max(0, this.durationSec - elapsedSec);
+    const elapsedSec = Math.max(0, (now - this.startTimeMs) / 1000);
+    return Math.min(this.durationSec, Math.max(0, this.durationSec - elapsedSec));
   }
 
   stop() {

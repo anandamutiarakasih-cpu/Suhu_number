@@ -8,17 +8,22 @@ import { firebaseService } from '../services/firebase-service.js';
 import { audio } from '../services/audio-service.js';
 import { toast } from '../components/notification.js';
 import { exportSessionToCSV } from '../services/export-service.js';
+import { networkService } from '../services/network-service.js';
 
 export function renderAdminView(container, { onExit }) {
   let activeSessionCode = null;
   let unsubscribe = null;
   let currentSessionData = null;
+  let freshnessInterval = null;
 
   container.innerHTML = `
     <div class="tc-view tc-admin-view">
-      <div class="tc-top-bar">
-        <button id="btn-admin-exit" class="tc-btn tc-btn-ghost">← Kembali ke Beranda</button>
-        <div class="tc-badge-lab"><span class="tc-pulse-dot"></span> PUSAT KENDALI LAPTOP GURU</div>
+      <div class="tc-top-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <button id="btn-admin-exit" class="tc-btn tc-btn-ghost">← Mode Siswa / Beranda</button>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div id="admin-net-badge-wrap"></div>
+          <div class="tc-badge-lab"><span class="tc-pulse-dot"></span> PUSAT KENDALI LAPTOP GURU (DASHBOARD)</div>
+        </div>
       </div>
 
       <div class="tc-admin-cockpit" id="admin-cockpit-main">
@@ -42,7 +47,35 @@ export function renderAdminView(container, { onExit }) {
           </div>
         </div>
 
-        <!-- Master Phase Controller Bar -->
+        <!-- Master Start & Auto-Game Monitor Banner -->
+        <div class="tc-card" id="admin-master-control-card" style="margin-bottom: 1.25rem; padding: 1.5rem; background: linear-gradient(135deg, rgba(249,115,22,0.12), rgba(15,23,42,0.95)); border: 2px solid var(--tc-orange); border-radius: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div style="max-width: 680px;">
+              <div class="tc-badge-lab" id="admin-master-badge" style="margin-bottom: 0.35rem;">
+                <span class="tc-pulse-dot"></span> MODE OTOMATIS: GURU HANYA MEMANTAU
+              </div>
+              <h3 id="admin-master-heading" style="font-size: 1.25rem; margin: 0; color: #fff;">
+                Menunggu Siswa Masuk ke Lobi...
+              </h3>
+              <p id="admin-master-desc" style="color: #94a3b8; font-size: 0.88rem; margin: 0.35rem 0 0 0; line-height: 1.5;">
+                Saat siswa sudah masuk lobi, klik <strong>"Mulai Permainan"</strong>. Seluruh kelompok akan otomatis bertanding serentak dari <strong>Game 1 ➔ Game 2 ➔ Game 3</strong> secara mandiri tanpa perlu dikontrol lagi oleh guru.
+              </p>
+            </div>
+            <div id="admin-master-action-wrap" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <button id="btn-master-start" class="tc-btn tc-btn-primary tc-btn-large" style="font-size: 1.05rem; font-weight: 800; padding: 0.95rem 1.6rem; box-shadow: 0 0 25px rgba(249,115,22,0.5);">
+                <span>🚀 MULAI PERMAINAN SEKARANG</span>
+              </button>
+              <button id="btn-master-leaderboard" class="tc-btn tc-btn-secondary hidden" style="font-size: 0.95rem; font-weight: 700; padding: 0.85rem 1.25rem;">
+                <span>🏆 Buka Leaderboard</span>
+              </button>
+              <button id="btn-master-back-lobby" class="tc-btn tc-btn-ghost danger hidden" style="font-size: 0.85rem;">
+                <span>⏪ Kembalikan ke Lobi</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master Phase Controller Bar (Manual Override) -->
         <div class="tc-card tc-phase-bar-card">
           <div class="tc-phase-bar-title">KENDALI FASE PERMAINAN (SERENTAK TERSINKRON KE SELURUH HP SISWA)</div>
           <div class="tc-phase-btn-row">
@@ -94,7 +127,8 @@ export function renderAdminView(container, { onExit }) {
               <div class="tc-card tc-admin-team-card" id="admin-team-card-${n}">
                 <div class="tc-atc-top">
                   <div class="tc-atc-num">KELOMPOK ${n}</div>
-                  <div class="tc-atc-status-wrap" style="display: flex; align-items: center; gap: 0.4rem;">
+                  <div class="tc-atc-status-wrap" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end;">
+                    <span class="tc-atc-stage-badge" id="atc-stage-${n}" style="font-size:0.75rem; padding:0.2rem 0.5rem; border-radius:4px; background:rgba(255,255,255,0.06); color:#cbd5e1; font-weight:600;">Lobi</span>
                     <span class="tc-atc-badge offline" id="atc-badge-${n}">Belum Masuk</span>
                     <button type="button" class="tc-btn-reset-slot hidden" id="atc-reset-${n}" data-team="${n}" title="Keluarkan & kosongkan slot Kelompok ${n}">
                       ✕ Reset
@@ -214,7 +248,7 @@ export function renderAdminView(container, { onExit }) {
     });
   });
 
-  // Phase Switch Buttons
+  // Phase Switch Buttons (Manual Override)
   const phaseButtons = container.querySelectorAll('.tc-btn-phase');
   phaseButtons.forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -233,6 +267,64 @@ export function renderAdminView(container, { onExit }) {
       }
     });
   });
+
+  // Master Game Start & Monitor Controls
+  const btnMasterStart = container.querySelector('#btn-master-start');
+  const btnMasterLB = container.querySelector('#btn-master-leaderboard');
+  const btnMasterBackLobby = container.querySelector('#btn-master-back-lobby');
+  const masterBadge = container.querySelector('#admin-master-badge');
+  const masterHeading = container.querySelector('#admin-master-heading');
+  const masterDesc = container.querySelector('#admin-master-desc');
+
+  if (btnMasterStart) {
+    btnMasterStart.addEventListener('click', async () => {
+      audio.playClick();
+      if (!activeSessionCode) {
+        toast.warning('Sedang menyiapkan kode sesi...');
+        return;
+      }
+      try {
+        btnMasterStart.disabled = true;
+        btnMasterStart.innerHTML = '<span>Memulai Seluruh Kelas...</span>';
+        await firebaseService.setSessionPhase(activeSessionCode, 'GAME1');
+        audio.playPhaseTransition();
+        toast.success('🚀 PERMAINAN DIMULAI! Seluruh HP siswa serentak masuk ke Game 1.');
+      } catch (err) {
+        toast.error('Gagal memulai permainan: ' + err.message);
+      } finally {
+        btnMasterStart.disabled = false;
+      }
+    });
+  }
+
+  if (btnMasterLB) {
+    btnMasterLB.addEventListener('click', async () => {
+      audio.playClick();
+      if (!activeSessionCode) return;
+      try {
+        await firebaseService.setSessionPhase(activeSessionCode, 'FINISHED');
+        audio.playFanfare();
+        toast.success('🏆 Membuka Klasemen Akhir & Podium Juara untuk semua siswa!');
+      } catch (err) {
+        toast.error('Gagal membuka leaderboard: ' + err.message);
+      }
+    });
+  }
+
+  if (btnMasterBackLobby) {
+    btnMasterBackLobby.addEventListener('click', async () => {
+      audio.playClick();
+      if (!activeSessionCode) return;
+      if (confirm('Kembalikan seluruh kelompok ke Lobi Persiapan?')) {
+        try {
+          await firebaseService.setSessionPhase(activeSessionCode, 'LOBBY');
+          toast.info('Seluruh kelompok dikembalikan ke Lobi Persiapan.');
+        } catch (err) {
+          toast.error('Gagal kembali ke lobi: ' + err.message);
+        }
+      }
+    });
+  }
 
   // Export CSV
   btnExportCSV.addEventListener('click', () => {
@@ -298,6 +390,120 @@ export function renderAdminView(container, { onExit }) {
     });
   }
 
+  // Attach Network Latency Monitor to Admin Top Bar
+  const netBadgeWrap = container.querySelector('#admin-net-badge-wrap');
+  const detachNet = netBadgeWrap ? networkService.attachBadge(netBadgeWrap) : () => {};
+
+  function updateTeamsStatus(session) {
+    if (!session) return;
+    const teams = session.teams || {};
+    const now = Date.now();
+
+    for (let i = 1; i <= 8; i++) {
+      const team = teams[`team_${i}`];
+      const card = container.querySelector(`#admin-team-card-${i}`);
+      if (!card) continue;
+
+      const badgeEl = card.querySelector(`#atc-badge-${i}`);
+      const nameEl = card.querySelector(`#atc-name-${i}`);
+      const memEl = card.querySelector(`#atc-members-${i}`);
+      const g1El = card.querySelector(`#atc-g1-${i}`);
+      const g2El = card.querySelector(`#atc-g2-${i}`);
+      const g3El = card.querySelector(`#atc-g3-${i}`);
+      const totEl = card.querySelector(`#atc-total-${i}`);
+      const predEl = card.querySelector(`#atc-pred-${i}`);
+      const resetBtn = card.querySelector(`#atc-reset-${i}`);
+
+      if (team && team.claimed) {
+        card.classList.add('active-team');
+        if (resetBtn) resetBtn.classList.remove('hidden');
+
+        // Evaluate real-time connection freshness from team's heartbeat
+        const lastActive = team.lastActive || 0;
+        const ageSec = lastActive ? Math.max(0, Math.floor((now - lastActive) / 1000)) : 0;
+        const ping = team.latency !== undefined ? `${team.latency}ms` : '';
+
+        if (!lastActive || ageSec < 15) {
+          badgeEl.className = 'tc-atc-badge online';
+          badgeEl.innerHTML = `<span class="tc-pulse-dot"></span> Online ${ping ? `(${ping})` : ''}`;
+        } else if (ageSec < 35) {
+          badgeEl.className = 'tc-atc-badge lag';
+          badgeEl.innerHTML = `<span class="tc-dot-yellow"></span> Lambat (${ageSec}d)`;
+        } else {
+          badgeEl.className = 'tc-atc-badge disconnected';
+          badgeEl.innerHTML = `<span class="tc-dot-red"></span> Terputus (${ageSec}d)`;
+        }
+
+        nameEl.textContent = team.name || `Kelompok ${i}`;
+        const mList = (team.members || []).map((m) => `${m.name} (${m.absen})`).join(', ');
+        memEl.textContent = mList || 'Belum ada anggota';
+
+        const g1 = team.scores?.game1 || 0;
+        const g2 = team.scores?.game2 || 0;
+        const g3 = team.scores?.game3 || 0;
+        const tot = team.scores?.total || 0;
+
+        g1El.textContent = g1;
+        g2El.textContent = g2;
+        g3El.textContent = g3;
+        totEl.textContent = tot;
+        predEl.textContent = team.predicate || 'Temperature Rookie';
+
+        // Update real-time stage progress tag
+        const stageEl = card.querySelector(`#atc-stage-${i}`);
+        if (stageEl) {
+          if ((g1 > 0 && g2 > 0 && g3 > 0) || tot >= 100) {
+            stageEl.style.background = 'rgba(234, 179, 8, 0.2)';
+            stageEl.style.color = '#fde047';
+            stageEl.textContent = '🏁 Tuntas';
+          } else if (g2 > 0) {
+            stageEl.style.background = 'rgba(168, 85, 247, 0.2)';
+            stageEl.style.color = '#c084fc';
+            stageEl.textContent = '🧩 Game 3';
+          } else if (g1 > 0) {
+            stageEl.style.background = 'rgba(56, 189, 248, 0.2)';
+            stageEl.style.color = '#38bdf8';
+            stageEl.textContent = '⚡ Game 2';
+          } else if (session.currentPhase && session.currentPhase !== 'LOBBY') {
+            stageEl.style.background = 'rgba(249, 115, 22, 0.2)';
+            stageEl.style.color = '#fb923c';
+            stageEl.textContent = '⛓️ Game 1';
+          } else {
+            stageEl.style.background = 'rgba(255,255,255,0.06)';
+            stageEl.style.color = '#94a3b8';
+            stageEl.textContent = '⏳ Di Lobi';
+          }
+        }
+      } else {
+        card.classList.remove('active-team');
+        badgeEl.className = 'tc-atc-badge offline';
+        badgeEl.textContent = 'Belum Masuk';
+        if (resetBtn) resetBtn.classList.add('hidden');
+        nameEl.textContent = '-';
+        memEl.textContent = '-';
+        g1El.textContent = '0';
+        g2El.textContent = '0';
+        g3El.textContent = '0';
+        totEl.textContent = '0';
+        predEl.textContent = 'Temperature Rookie';
+
+        const stageEl = card.querySelector(`#atc-stage-${i}`);
+        if (stageEl) {
+          stageEl.style.background = 'rgba(255,255,255,0.06)';
+          stageEl.style.color = '#64748b';
+          stageEl.textContent = 'Belum Masuk';
+        }
+      }
+    }
+  }
+
+  // Periodic refresher to update connection seconds & lag indicators even without data mutations
+  freshnessInterval = setInterval(() => {
+    if (currentSessionData) {
+      updateTeamsStatus(currentSessionData);
+    }
+  }, 3000);
+
   function attachSessionListener(code) {
     if (unsubscribe) unsubscribe();
 
@@ -305,79 +511,44 @@ export function renderAdminView(container, { onExit }) {
       if (!session) return;
       currentSessionData = session;
 
-      // Update Phase Highlight
       const activePhase = session.currentPhase || 'LOBBY';
+
+      // Update Master Start & Monitor Banner
+      if (activePhase === 'LOBBY') {
+        if (btnMasterStart) btnMasterStart.classList.remove('hidden');
+        if (btnMasterLB) btnMasterLB.classList.add('hidden');
+        if (btnMasterBackLobby) btnMasterBackLobby.classList.add('hidden');
+        if (masterBadge) masterBadge.innerHTML = '<span class="tc-pulse-dot"></span> LOBI PERSIAPAN AKTIF';
+        if (masterHeading) masterHeading.textContent = 'Menunggu Siswa Masuk ke Lobi...';
+        if (masterDesc) masterDesc.textContent = 'Bagikan kode atau link ke siswa. Saat semua kelompok siap, klik "MULAI PERMAINAN SEKARANG". Siswa akan otomatis bertanding serentak dari Game 1 ➔ Game 2 ➔ Game 3 secara mandiri.';
+      } else {
+        if (btnMasterStart) btnMasterStart.classList.add('hidden');
+        if (btnMasterLB) btnMasterLB.classList.remove('hidden');
+        if (btnMasterBackLobby) btnMasterBackLobby.classList.remove('hidden');
+        if (masterBadge) masterBadge.innerHTML = '<span class="tc-pulse-dot" style="background:#22c55e;"></span> PERMAINAN BERJALAN MANDIRI';
+        if (masterHeading) masterHeading.textContent = 'Siswa Sedang Bertanding (Game 1 ➔ Game 2 ➔ Game 3)';
+        if (masterDesc) masterDesc.textContent = 'Guru hanya memantau perolehan skor langsung pada papan skor di bawah. Tidak perlu mengontrol perpindahan sesi game.';
+      }
+
+      // Update Phase Highlight Buttons
       container.querySelectorAll('.tc-btn-phase').forEach((btn) => {
         btn.classList.toggle('active', btn.dataset.phase === activePhase);
       });
 
       // Update 8 Teams Monitor Cards
-      const teams = session.teams || {};
-      for (let i = 1; i <= 8; i++) {
-        const team = teams[`team_${i}`];
-        const card = container.querySelector(`#admin-team-card-${i}`);
-        if (!card) continue;
-
-        const badgeEl = card.querySelector(`#atc-badge-${i}`);
-        const nameEl = card.querySelector(`#atc-name-${i}`);
-        const memEl = card.querySelector(`#atc-members-${i}`);
-        const g1El = card.querySelector(`#atc-g1-${i}`);
-        const g2El = card.querySelector(`#atc-g2-${i}`);
-        const g3El = card.querySelector(`#atc-g3-${i}`);
-        const totEl = card.querySelector(`#atc-total-${i}`);
-        const predEl = card.querySelector(`#atc-pred-${i}`);
-        const resetBtn = card.querySelector(`#atc-reset-${i}`);
-
-        if (team && team.claimed) {
-          card.classList.add('active-team');
-          badgeEl.className = 'tc-atc-badge online';
-          badgeEl.textContent = 'Terkoneksi';
-          if (resetBtn) resetBtn.classList.remove('hidden');
-
-          nameEl.textContent = team.name || `Kelompok ${i}`;
-          const mList = (team.members || []).map((m) => `${m.name} (${m.absen})`).join(', ');
-          memEl.textContent = mList || 'Belum ada anggota';
-
-          const g1 = team.scores?.game1 || 0;
-          const g2 = team.scores?.game2 || 0;
-          const g3 = team.scores?.game3 || 0;
-          const tot = team.scores?.total || 0;
-
-          g1El.textContent = g1;
-          g2El.textContent = g2;
-          g3El.textContent = g3;
-          totEl.textContent = tot;
-          predEl.textContent = team.predicate || 'Temperature Rookie';
-        } else {
-          card.classList.remove('active-team');
-          badgeEl.className = 'tc-atc-badge offline';
-          badgeEl.textContent = 'Belum Masuk';
-          if (resetBtn) resetBtn.classList.add('hidden');
-          nameEl.textContent = '-';
-          memEl.textContent = '-';
-          g1El.textContent = '0';
-          g2El.textContent = '0';
-          g3El.textContent = '0';
-          totEl.textContent = '0';
-          predEl.textContent = 'Temperature Rookie';
-        }
-      }
+      updateTeamsStatus(session);
     });
   }
 
-  // Check saved admin session or create immediately
-  const existingCode = localStorage.getItem('tc_active_admin_session');
-  if (existingCode && existingCode.startsWith('TC')) {
-    activeSessionCode = existingCode;
-    dispCode.textContent = activeSessionCode;
-    attachSessionListener(activeSessionCode);
-  } else {
-    createSessionNow();
-  }
+  // Selalu buat sesi baru bersih di awal sesuai permintaan: reset ulang di awal
+  localStorage.removeItem('tc_active_admin_session');
+  createSessionNow();
 
   return {
     destroy: () => {
+      if (freshnessInterval) clearInterval(freshnessInterval);
       if (unsubscribe) unsubscribe();
+      if (detachNet) detachNet();
     }
   };
 }
