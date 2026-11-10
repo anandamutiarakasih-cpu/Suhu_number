@@ -15,7 +15,7 @@ import { loadStyle } from '../utils/asset-loader.js';
 import { showInGameLeaderboardModal } from '../components/in-game-leaderboard-modal.js';
 
 export function renderGame1View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
-  loadStyle('css/game1.css?v=3.0');
+  loadStyle('css/game1.css?v=3.1');
 
   let currentStageIndex = 0;
   let currentSteps = []; // array of 5 step objects in current user order
@@ -191,26 +191,30 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
 
       return `
         <div class="tc-reorder-card ${isSelected ? 'selected' : ''}" data-idx="${idx}" id="step-card-${idx}">
-          <div class="tc-reorder-num-badge">
-            <span class="tc-badge-step-digit">${stepNum}</span>
-            <span class="tc-badge-step-lbl">${isFirst ? 'Awal' : isLast ? 'Akhir' : 'Langkah'}</span>
-          </div>
-
-          <div class="tc-reorder-content" title="Ketuk untuk menukar posisi">
-            <div class="tc-reorder-heading">
-              <span class="tc-reorder-icon">${item.icon}</span>
-              <span>${item.title}</span>
+          <div class="tc-reorder-header-row">
+            <div class="tc-reorder-num-badge">
+              <span class="tc-badge-step-digit">${stepNum}</span>
+              <span class="tc-badge-step-lbl">${isFirst ? 'Awal' : isLast ? 'Akhir' : 'Langkah'}</span>
             </div>
-            <p class="tc-reorder-desc">${item.desc}</p>
-            <span class="tc-reorder-swap-hint">${isSelected ? '⚡ Terpilih! Ketuk kartu lain untuk menukar.' : '👆 Ketuk kartu ini untuk menukar posisi'}</span>
+
+            <div class="tc-reorder-content" title="Ketuk untuk menukar posisi">
+              <div class="tc-reorder-heading">
+                <span class="tc-reorder-icon">${item.icon}</span>
+                <span>${item.title}</span>
+              </div>
+              <p class="tc-reorder-desc">${item.desc}</p>
+              <span class="tc-reorder-swap-hint">${isSelected ? '⚡ Terpilih! Ketuk kartu lain untuk menukar.' : '👆 Ketuk kartu ini untuk menukar posisi'}</span>
+            </div>
           </div>
 
           <div class="tc-reorder-ctrls">
             <button type="button" class="tc-move-btn btn-move-up" data-idx="${idx}" ${isFirst ? 'disabled' : ''} title="Pindahkan langkah ke atas" aria-label="Naik">
-              ▲
+              <span class="tc-move-arrow">▲</span>
+              <span class="tc-move-lbl">Naik</span>
             </button>
             <button type="button" class="tc-move-btn btn-move-down" data-idx="${idx}" ${isLast ? 'disabled' : ''} title="Pindahkan langkah ke bawah" aria-label="Turun">
-              ▼
+              <span class="tc-move-arrow">▼</span>
+              <span class="tc-move-lbl">Turun</span>
             </button>
           </div>
         </div>

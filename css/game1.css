@@ -1,7 +1,7 @@
 /**
  * CHAMPIONS OF CALOR: CLASH OF SCIENCE
  * Game 1 - Number Chains Styles
- * Ultra-Responsive, Large Touch Targets & Intuitive Reordering for SMP Kelas VII
+ * Ultra-Responsive: Desktop Horizontal & Mobile Ergonomic Cards (iOS & Android)
  */
 
 .tc-chain-stage-header {
@@ -129,6 +129,15 @@
   box-shadow: 0 0 20px rgba(250, 204, 21, 0.6);
 }
 
+/* Header Row inside card */
+.tc-reorder-header-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-grow: 1;
+  min-width: 0;
+}
+
 /* Position Number Badge */
 .tc-reorder-num-badge {
   display: flex;
@@ -219,7 +228,7 @@
 }
 
 /* ====================================================
-   LARGE TACTILE UP/DOWN BUTTONS (SUPER RESPONSIF DI HP)
+   TACTILE UP/DOWN BUTTONS (DESKTOP DEFAULT)
    ==================================================== */
 .tc-reorder-ctrls {
   display: flex;
@@ -247,6 +256,10 @@
   font-size: 1.35rem;
   font-weight: 900;
   line-height: 1;
+}
+
+.tc-move-btn .tc-move-lbl {
+  display: none; /* Hidden on desktop */
 }
 
 .tc-move-btn.btn-move-up {
@@ -308,27 +321,58 @@
 }
 
 /* ====================================================
-   MOBILE RESPONSIVENESS (ANDROID & IPHONE OPTIMIZATION)
+   MOBILE RESPONSIVENESS (ANDROID & IPHONE SPECIFIC)
    ==================================================== */
 @media (max-width: 640px) {
+  .tc-chain-stage-header {
+    margin-bottom: 0.85rem;
+  }
+
   .tc-chain-title {
-    font-size: 1.35rem;
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .tc-chain-story-box {
+    font-size: 0.85rem;
+    line-height: 1.45;
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .tc-chain-hint-pill {
+    font-size: 0.76rem;
+    padding: 0.35rem 0.75rem;
   }
 
   .tc-chain-instruction-bar {
-    font-size: 0.82rem;
-    padding: 0.65rem 0.85rem;
+    font-size: 0.8rem;
+    padding: 0.55rem 0.85rem;
+    margin: 0.75rem auto 1rem auto;
   }
 
+  /* Mobile Ergonomic Card Layout: Stacked for Max Legibility & Thumb Ease */
   .tc-reorder-card {
-    padding: 0.85rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.9rem 1rem;
     gap: 0.65rem;
-    border-radius: 14px;
+    border-radius: 16px;
+    background: rgba(30, 41, 59, 0.95);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .tc-reorder-header-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
   }
 
   .tc-reorder-num-badge {
-    min-width: 48px;
-    height: 48px;
+    min-width: 46px;
+    height: 46px;
     border-radius: 12px;
   }
 
@@ -341,33 +385,61 @@
   }
 
   .tc-reorder-heading {
-    font-size: 0.95rem;
-    margin-bottom: 0.2rem;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
   }
 
   .tc-reorder-desc {
-    font-size: 0.82rem;
-    line-height: 1.35;
+    font-size: 0.85rem;
+    line-height: 1.4;
   }
 
+  .tc-reorder-swap-hint {
+    font-size: 0.72rem;
+    margin-top: 0.25rem;
+  }
+
+  /* Two Wide Side-by-Side Thumb Buttons Spanning 50% Width Each */
   .tc-reorder-ctrls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    width: 100%;
+    margin-left: 0;
+    margin-top: 0.25rem;
+  }
+
+  .tc-move-btn {
+    width: 100%;
+    height: 44px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     gap: 0.4rem;
   }
 
-  /* Large Touch Buttons for Thumbs on Mobile */
-  .tc-move-btn {
-    width: 52px;
-    height: 46px;
-    font-size: 1.35rem;
-    border-radius: 10px;
+  .tc-move-btn .tc-move-arrow {
+    font-size: 1.05rem;
+  }
+
+  .tc-move-btn .tc-move-lbl {
+    display: inline;
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    letter-spacing: 0.02em;
   }
 
   .tc-chain-bottom-bar {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.65rem;
   }
 
   .tc-chain-bottom-bar .tc-btn {
     width: 100%;
+    padding: 0.95rem 1rem;
   }
 }

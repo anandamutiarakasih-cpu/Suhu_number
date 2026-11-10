@@ -412,7 +412,8 @@
   }
 
   .tc-givens-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+    gap: 0.45rem;
   }
 
   .tc-target-input-field {

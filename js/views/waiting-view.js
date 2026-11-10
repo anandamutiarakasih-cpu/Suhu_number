@@ -59,17 +59,6 @@ export function renderWaitingView(container, { sessionCode, teamNumber, onPhaseC
         </div>
       </div>
 
-      <!-- Quick Cancel Action Box -->
-      <div class="tc-waiting-cancel-box">
-        <div class="tc-cancel-hint">
-          <span style="color: #f87171; font-weight: 700; margin-right: 4px;">⚠️ Perlu perubahan?</span>
-          <span>Salah memilih nomor kelompok atau salah memasukkan nama & absen siswa?</span>
-        </div>
-        <button id="btn-cancel-waiting-link" class="tc-cancel-link-btn" type="button">
-          ✕ Batalkan & Ganti Kelompok
-        </button>
-      </div>
-
       <!-- 8 Teams Grid Status -->
       <div class="tc-all-teams-section">
         <h4 class="tc-section-title">STATUS 8 KELOMPOK DALAM SESI</h4>

@@ -17,7 +17,7 @@ import { loadStyle } from '../utils/asset-loader.js';
 import { showInGameLeaderboardModal } from '../components/in-game-leaderboard-modal.js';
 
 export function renderGame3View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
-  loadStyle('css/game3.css?v=2.9');
+  loadStyle('css/game3.css?v=3.1');
 
   let currentIndex = 0;
   let userAnswer = '';
