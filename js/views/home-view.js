@@ -5,9 +5,12 @@
 
 import { audio } from '../services/audio-service.js';
 import { toast } from '../components/notification.js';
+import { showLabModal } from '../components/modal.js';
+import { isMobileDevice } from '../utils/device.js';
 
 export function renderHomeView(container, { onJoinTeam, onOpenAdmin }) {
   const isMuted = audio.isMuted();
+  const isMobile = isMobileDevice();
 
   container.innerHTML = `
     <div class="tc-view tc-home-view">
@@ -66,15 +69,15 @@ export function renderHomeView(container, { onJoinTeam, onOpenAdmin }) {
 
         <!-- Teacher / Admin Card -->
         <div class="tc-card tc-role-card tc-role-admin">
-          <div class="tc-role-badge admin">GURU / INSTRUKTUR (LAPTOP)</div>
+          <div class="tc-role-badge admin">${isMobile ? '🔒 KHUSUS LAPTOP / DESKTOP' : 'GURU / INSTRUKTUR (LAPTOP)'}</div>
           <div class="tc-role-icon">💻</div>
           <h2 class="tc-role-name">Pusat Kendali Guru</h2>
           <p class="tc-role-info">
             Pantau 8 kelompok secara live dari laptop, kendalikan timer & babak serentak, serta unduh rekap nilai CSV tanpa proyektor.
           </p>
           <div class="tc-admin-action-wrap">
-            <button id="btn-goto-admin" class="tc-btn tc-btn-primary tc-btn-block">
-              <span>BUAT KODE SESI / KENDALI GURU</span>
+            <button id="btn-goto-admin" class="tc-btn ${isMobile ? 'tc-btn-secondary' : 'tc-btn-primary'} tc-btn-block">
+              <span>${isMobile ? 'AKSES KHUSUS LAPTOP GURU 🔒' : 'BUAT KODE SESI / KENDALI GURU'}</span>
               <span class="tc-btn-arrow">➔</span>
             </button>
           </div>
@@ -133,10 +136,28 @@ export function renderHomeView(container, { onJoinTeam, onOpenAdmin }) {
     if (onJoinTeam) onJoinTeam(code);
   });
 
-  // Admin Portal Button
+  // Admin Portal Button (Desktop Only)
   const btnAdmin = container.querySelector('#btn-goto-admin');
   btnAdmin.addEventListener('click', () => {
     audio.playClick();
+    if (isMobile) {
+      showLabModal({
+        title: 'AKSES GURU KHUSUS DESKTOP',
+        contentHtml: `
+          <div style="font-size:0.95rem; color:#f1f5f9; line-height:1.6;">
+            <p style="margin-bottom:0.75rem;">
+              Pusat Kendali Guru dirancang khusus untuk layar besar <strong>Komputer atau Laptop (Desktop)</strong> agar guru dapat mengawasi nilai dan progres 8 kelompok secara serentak.
+            </p>
+            <div style="background:rgba(56, 189, 248, 0.15); border-left:3px solid #38bdf8; padding:0.85rem 1rem; border-radius:8px; font-size:0.88rem; color:#bae6fd; line-height:1.5;">
+              📱 <strong>Penggunaan di HP:</strong> Siswa menggunakan HP untuk bergabung ke permainan. Silakan gunakan kartu <strong>Kelompok Siswa</strong> di atas dengan memasukkan kode sesi.
+            </div>
+          </div>
+        `,
+        confirmText: 'Mengerti (Mode Siswa)',
+        onConfirm: () => {}
+      });
+      return;
+    }
     if (onOpenAdmin) onOpenAdmin();
   });
 

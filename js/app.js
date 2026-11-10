@@ -18,6 +18,7 @@ import { renderGame2View } from './views/game2-view.js';
 import { renderGame3View } from './views/game3-view.js';
 import { renderLeaderboardView } from './views/leaderboard-view.js';
 import { loadStyle, preloadStyle } from './utils/asset-loader.js';
+import { isMobileDevice } from './utils/device.js';
 
 class ChampionsOfCalorApp {
   constructor() {
@@ -69,11 +70,18 @@ class ChampionsOfCalorApp {
         }
       } catch (e) {}
 
-      // Otomatis ke reset ulang di awal dan kembali ke dashboard
-      this.navigate('admin');
-      setTimeout(() => {
-        toast.info('Halaman dimuat ulang: Sesi permainan telah direset ulang ke awal di Dashboard.');
-      }, 400);
+      // Reset sesuai perangkat: Mobile (Android/iPhone) ke Beranda Siswa, Desktop ke Dashboard Guru
+      if (isMobileDevice()) {
+        this.navigate('home');
+        setTimeout(() => {
+          toast.info('Sesi dimuat ulang: Anda berada di Beranda / Mode Siswa.');
+        }, 400);
+      } else {
+        this.navigate('admin');
+        setTimeout(() => {
+          toast.info('Halaman dimuat ulang: Sesi permainan telah direset ulang ke awal di Dashboard Guru.');
+        }, 400);
+      }
       return;
     }
 
@@ -90,8 +98,11 @@ class ChampionsOfCalorApp {
     if (urlCode) {
       this.state.sessionCode = urlCode;
       this.navigate('register', { sessionCode: urlCode });
+    } else if (isMobileDevice()) {
+      // Akses Android & iPhone otomatis langsung berada di Beranda / Mode Siswa
+      this.navigate('home');
     } else {
-      // Otomatis berada di Dashboard saat user membuka link web
+      // Akses Desktop / Laptop otomatis langsung berada di Dashboard Guru
       this.navigate('admin');
     }
   }
@@ -126,7 +137,7 @@ class ChampionsOfCalorApp {
       }
     } catch (e) {}
 
-    if (isStudent) {
+    if (isStudent || isMobileDevice()) {
       this.navigate('home');
     } else {
       this.navigate('admin');
@@ -282,6 +293,10 @@ class ChampionsOfCalorApp {
             this.navigate('register', { sessionCode });
           },
           onOpenAdmin: () => {
+            if (isMobileDevice()) {
+              toast.warning('Akses Terbatas: Pusat Kendali Guru hanya dapat diakses melalui Desktop / Laptop.');
+              return;
+            }
             this.navigate('admin');
           }
         });
@@ -321,6 +336,11 @@ class ChampionsOfCalorApp {
         break;
 
       case 'admin':
+        if (isMobileDevice()) {
+          toast.warning('Akses Terbatas: Pusat Kendali Guru hanya dapat diakses melalui Desktop / Laptop.');
+          this.navigate('home');
+          break;
+        }
         this.currentViewInstance = renderAdminView(this.appContainer, {
           onExit: () => {
             this.navigate('home');

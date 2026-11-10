@@ -9,8 +9,31 @@ import { audio } from '../services/audio-service.js';
 import { toast } from '../components/notification.js';
 import { exportSessionToCSV } from '../services/export-service.js';
 import { networkService } from '../services/network-service.js';
+import { isMobileDevice } from '../utils/device.js';
 
 export function renderAdminView(container, { onExit }) {
+  if (isMobileDevice()) {
+    container.innerHTML = `
+      <div class="tc-view tc-admin-lock-view" style="max-width:540px; margin:2.5rem auto; text-align:center; padding:1.5rem 1rem;">
+        <div class="tc-card" style="padding:2.5rem 1.75rem;">
+          <div style="font-size:3.5rem; margin-bottom:1rem;">💻</div>
+          <div class="tc-badge-lab">AKSES KHUSUS DESKTOP</div>
+          <h2 style="font-size:1.6rem; margin:0.75rem 0; color:var(--tc-sky);">Pusat Kendali Guru Hanya untuk Laptop/PC</h2>
+          <p style="color:#94a3b8; font-size:0.95rem; line-height:1.6; margin-bottom:1.5rem;">
+            Dashboard pemantauan guru dirancang khusus untuk layar lebar (Komputer/Laptop). Smartphone (Android & iPhone) hanya dapat mengakses Mode Siswa untuk bermain.
+          </p>
+          <button id="btn-back-to-student-mode" class="tc-btn tc-btn-primary tc-btn-large" style="width:100%;">
+            <span>Masuk ke Mode Siswa (Beranda)</span>
+            <span>➔</span>
+          </button>
+        </div>
+      </div>
+    `;
+    const btn = container.querySelector('#btn-back-to-student-mode');
+    if (btn) btn.addEventListener('click', () => { if (onExit) onExit(); });
+    return { destroy: () => {} };
+  }
+
   let activeSessionCode = null;
   let unsubscribe = null;
   let currentSessionData = null;
