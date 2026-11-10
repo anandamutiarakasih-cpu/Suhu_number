@@ -321,7 +321,7 @@ class ChampionsOfCalorApp {
         break;
 
       case 'waiting':
-        preloadStyle('css/game1.css?v=3.1');
+        preloadStyle('css/game1.css?v=3.2');
         this.currentViewInstance = renderWaitingView(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -349,8 +349,8 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game1':
-        loadStyle('css/game1.css?v=3.1');
-        preloadStyle('css/game2.css?v=3.1');
+        loadStyle('css/game1.css?v=3.2');
+        preloadStyle('css/game2.css?v=3.2');
         this.currentViewInstance = renderGame1View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -366,8 +366,8 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game2':
-        loadStyle('css/game2.css?v=3.1');
-        preloadStyle('css/game3.css?v=3.1');
+        loadStyle('css/game2.css?v=3.2');
+        preloadStyle('css/game3.css?v=3.2');
         this.currentViewInstance = renderGame2View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -385,8 +385,8 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game3':
-        loadStyle('css/game3.css?v=3.1');
-        preloadStyle('css/leaderboard.css?v=3.1');
+        loadStyle('css/game3.css?v=3.2');
+        preloadStyle('css/leaderboard.css?v=3.2');
         this.currentViewInstance = renderGame3View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -404,7 +404,7 @@ class ChampionsOfCalorApp {
         break;
 
       case 'leaderboard':
-        loadStyle('css/leaderboard.css?v=3.1');
+        loadStyle('css/leaderboard.css?v=3.2');
         this.currentViewInstance = renderLeaderboardView(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
