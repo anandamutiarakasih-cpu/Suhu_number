@@ -7,25 +7,36 @@ import { audio } from '../services/audio-service.js';
 
 export class SyncTimer {
   /**
-   * @param {Object} options
-   * @param {HTMLElement} options.container
-   * @param {number} options.durationSec - Total duration in seconds
-   * @param {number} options.startTimeMs - Server start timestamp (ms)
-   * @param {Function} options.getServerTime - Function returning current server time (ms)
-   * @param {Function} options.onComplete - Callback when timer reaches 0
+   * @param {Object} [options]
+   * @param {HTMLElement} [options.container]
+   * @param {number} [options.durationSec] - Total duration in seconds
+   * @param {number} [options.durationSeconds] - Alias for durationSec
+   * @param {number} [options.startTimeMs] - Server start timestamp (ms)
+   * @param {Function} [options.getServerTime] - Function returning current server time (ms)
+   * @param {Function} [options.onComplete] - Callback when timer reaches 0
+   * @param {Function} [options.onTimeUp] - Alias for onComplete
    * @param {Function} [options.onTick] - Optional tick callback
    */
-  constructor({ container, durationSec, startTimeMs, getServerTime, onComplete, onTick }) {
-    this.container = container;
-    this.durationSec = durationSec;
-    this.startTimeMs = startTimeMs || Date.now();
-    this.getServerTime = getServerTime || (() => Date.now());
-    this.onComplete = onComplete;
-    this.onTick = onTick;
+  constructor(options = {}) {
+    this.container = options.container || null;
+    this.durationSec = Number(options.durationSec || options.durationSeconds) || 60;
+    this.startTimeMs = options.startTimeMs || Date.now();
+    this.getServerTime = typeof options.getServerTime === 'function' ? options.getServerTime : (() => Date.now());
+    this.onComplete = options.onComplete || options.onTimeUp || null;
+    this.onTick = options.onTick || null;
     this.timerId = null;
     this.lastSec = null;
     this.hasWarnedUrgent = false;
 
+    if (this.container) {
+      this.render();
+      this.start();
+    }
+  }
+
+  mount(containerEl) {
+    if (!containerEl) return;
+    this.container = containerEl;
     this.render();
     this.start();
   }
@@ -58,6 +69,7 @@ export class SyncTimer {
   }
 
   start() {
+    this.stop();
     this.update();
     this.timerId = setInterval(() => this.update(), 100);
   }

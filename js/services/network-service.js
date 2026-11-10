@@ -65,17 +65,10 @@ class NetworkService {
 
     try {
       await fetch(pingTarget, {
-        method: 'HEAD',
+        method: 'GET',
         mode: 'cors',
         cache: 'no-store',
         signal: controller.signal
-      }).catch(async () => {
-        return await fetch(pingTarget, {
-          method: 'GET',
-          mode: 'cors',
-          cache: 'no-store',
-          signal: controller.signal
-        });
       });
 
       clearTimeout(timeoutId);

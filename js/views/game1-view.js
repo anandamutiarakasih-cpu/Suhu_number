@@ -15,7 +15,7 @@ import { loadStyle } from '../utils/asset-loader.js';
 import { showInGameLeaderboardModal } from '../components/in-game-leaderboard-modal.js';
 
 export function renderGame1View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
-  loadStyle('css/game1.css?v=3.2');
+  loadStyle('css/game1.css?v=3.3');
 
   let currentStageIndex = 0;
   let currentSteps = []; // array of 5 step objects in current user order

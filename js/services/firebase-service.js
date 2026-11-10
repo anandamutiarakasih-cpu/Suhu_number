@@ -21,9 +21,21 @@ class FirebaseService {
     this.activeSubscriptions = new Map();
     this.activeSSE = new Map();
     this.sessionsCache = new Map();
+    this.readyPromise = null;
 
     this.initBroadcastChannel();
-    this.initFirebase();
+    this.readyPromise = this.initFirebase();
+  }
+
+  async ensureReady() {
+    if (this.isFirebaseReady) return true;
+    if (this.readyPromise) {
+      await this.readyPromise;
+      return this.isFirebaseReady;
+    }
+    this.readyPromise = this.initFirebase();
+    await this.readyPromise;
+    return this.isFirebaseReady;
   }
 
   initBroadcastChannel() {
@@ -40,8 +52,19 @@ class FirebaseService {
   }
 
   async initFirebase() {
+    // 1. Wait up to 3 seconds for window.firebase from CDN if in browser
+    if (typeof window !== 'undefined') {
+      const start = Date.now();
+      while (Date.now() - start < 3000) {
+        if (window.firebase && typeof window.firebase.database === 'function') {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 40));
+      }
+    }
+
     // 1. Try global window.firebase from CDN first (fastest & most reliable)
-    if (typeof window !== 'undefined' && window.firebase) {
+    if (typeof window !== 'undefined' && window.firebase && typeof window.firebase.database === 'function') {
       try {
         if (!window.firebase.apps || !window.firebase.apps.length) {
           this.app = window.firebase.initializeApp(firebaseConfig);
@@ -77,7 +100,7 @@ class FirebaseService {
           this.isOnline = !!snap.val();
         });
 
-        return;
+        return true;
       } catch (e) {
         console.warn('CDN Firebase init error:', e);
       }
@@ -85,8 +108,8 @@ class FirebaseService {
 
     // 2. Fallback to modular dynamic import
     try {
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
-      const { getDatabase, ref, onValue, set, update, get } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js');
+      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+      const { getDatabase, ref, onValue, set, update, get } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js');
 
       this.app = initializeApp(firebaseConfig);
       this.db = firebaseConfig.databaseURL ? getDatabase(this.app, firebaseConfig.databaseURL) : getDatabase(this.app);
@@ -107,10 +130,13 @@ class FirebaseService {
       });
 
       this.isFirebaseReady = true;
+      this.isOnline = true;
       console.log('🟢 Firebase RTDB Initialized via Modular ESM');
+      return true;
     } catch (err) {
-      console.warn('⚠️ Firebase initial note (falling back to Cloud Relay & LocalStorage):', err.message);
+      console.warn('⚠️ Firebase initialization error:', err.message);
       this.isFirebaseReady = false;
+      return false;
     }
   }
 
@@ -159,9 +185,6 @@ class FirebaseService {
     try {
       localStorage.setItem(`tc_session_${sessionCode}`, JSON.stringify(sessionData));
     } catch (e) {}
-
-    // Global Cloud Relay (Internet Relay for cross-network mobile & laptop)
-    this.publishToCloudRelay(sessionCode, sessionData);
   }
 
   getLocalSession(sessionCode) {
@@ -173,70 +196,11 @@ class FirebaseService {
     }
   }
 
-  async publishToCloudRelay(sessionCode, sessionData) {
-    if (!sessionCode || !sessionData) return;
-    try {
-      fetch(`https://ntfy.sh/suhu_number_${sessionCode}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sessionData)
-      }).catch(() => {});
-    } catch (err) {}
-  }
-
-  async fetchFromCloudRelay(sessionCode) {
-    if (!sessionCode) return null;
-    try {
-      const res = await fetch(`https://ntfy.sh/suhu_number_${sessionCode}/json?poll=1&since=all`);
-      if (!res.ok) return null;
-      const text = await res.text();
-      const lines = text.trim().split('\n').filter(Boolean);
-      for (let i = lines.length - 1; i >= 0; i--) {
-        try {
-          const item = JSON.parse(lines[i]);
-          if (item && item.message) {
-            const data = JSON.parse(item.message);
-            if (data && data.code === sessionCode) {
-              return data;
-            }
-          }
-        } catch (e) {}
-      }
-    } catch (err) {}
-    return null;
-  }
-
-  listenToCloudRelay(sessionCode, callback) {
-    if (!sessionCode || typeof EventSource === 'undefined') return () => {};
-    try {
-      const eventSource = new EventSource(`https://ntfy.sh/suhu_number_${sessionCode}/sse`);
-      eventSource.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload && payload.message) {
-            const data = JSON.parse(payload.message);
-            if (data && data.code === sessionCode) {
-              this.sessionsCache.set(sessionCode, data);
-              try {
-                localStorage.setItem(`tc_session_${sessionCode}`, JSON.stringify(data));
-              } catch (e) {}
-              callback(data);
-            }
-          }
-        } catch (e) {}
-      };
-      return () => {
-        eventSource.close();
-      };
-    } catch (err) {
-      return () => {};
-    }
-  }
-
   /**
    * CREATE A NEW GAME SESSION (INSTANT & NON-BLOCKING)
    */
   async createSession(title = 'Sesi Pembelajaran Kalor SMP Kelas VII') {
+    await this.ensureReady();
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     let code = 'TC';
     for (let i = 0; i < 4; i++) {
@@ -266,16 +230,14 @@ class FirebaseService {
       localStorage.setItem(`tc_session_${code}`, JSON.stringify(sessionData));
     } catch (e) {}
 
-    // Non-blocking background write to Firebase RTDB
+    // Reliable write to Firebase RTDB
     if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
       try {
         const sRef = this.fbRef(this.db, `sessions/${code}`);
-        const p = this.fbSet(sRef, sessionData);
-        if (p && typeof p.catch === 'function') {
-          p.catch((e) => console.warn('Firebase set session background:', e));
-        }
+        await this.fbSet(sRef, sessionData);
+        console.log(`🟢 Firebase session created in RTDB: sessions/${code}`);
       } catch (e) {
-        console.warn('Firebase ref error:', e);
+        console.warn('Firebase set session error:', e);
       }
     }
 
@@ -287,6 +249,7 @@ class FirebaseService {
    * JOIN SESSION & REGISTER TEAM (1 to 8)
    */
   async joinSession(sessionCode, teamNumber, teamName, members) {
+    await this.ensureReady();
     const num = parseInt(teamNumber, 10);
     if (isNaN(num) || num < 1 || num > 8) {
       throw new Error('Nomor kelompok harus berada di antara 1 sampai 8.');
@@ -387,6 +350,7 @@ class FirebaseService {
    * LEAVE SESSION & RELEASE TEAM SLOT (CALLED BY STUDENT OR TEACHER)
    */
   async leaveSession(sessionCode, teamNumber) {
+    await this.ensureReady();
     const num = parseInt(teamNumber, 10);
     if (isNaN(num) || num < 1 || num > 8) {
       return { success: false, error: 'Nomor kelompok tidak valid.' };
@@ -462,6 +426,7 @@ class FirebaseService {
    * SET SESSION PHASE (ADMIN CONTROL)
    */
   async setSessionPhase(sessionCode, phase) {
+    await this.ensureReady();
     let session = await this.getSession(sessionCode);
     if (!session) throw new Error('Sesi tidak ditemukan.');
 
@@ -527,6 +492,7 @@ class FirebaseService {
    * Prevents duplicate scoring on refresh, locks answers, updates leaderboard in realtime
    */
   async submitQuestionAnswer(sessionCode, teamNumber, gameKey, questionId, { isCorrect, remainingSeconds = 0, totalSeconds = 60, answerData = null }) {
+    await this.ensureReady();
     const num = parseInt(teamNumber, 10);
     const session = await this.getSession(sessionCode);
     if (!session || !session.teams || !session.teams[`team_${num}`]) {
@@ -641,6 +607,7 @@ class FirebaseService {
    * SUBMIT GAME 1 (NUMBER CHAINS COMPLETION)
    */
   async submitGame1Score(sessionCode, teamNumber, correctCount, totalStages = 5) {
+    await this.ensureReady();
     const session = await this.getSession(sessionCode);
     if (!session || !session.teams || !session.teams[`team_${teamNumber}`]) {
       throw new Error('Data kelompok tidak ditemukan.');
@@ -697,6 +664,7 @@ class FirebaseService {
    * SUBMIT GAME 2 (START CHAMP MATCHING COMPLETION)
    */
   async submitGame2Score(sessionCode, teamNumber, correctCount, totalItems = 12) {
+    await this.ensureReady();
     const session = await this.getSession(sessionCode);
     if (!session || !session.teams || !session.teams[`team_${teamNumber}`]) {
       throw new Error('Data kelompok tidak ditemukan.');
@@ -753,6 +721,7 @@ class FirebaseService {
    * SUBMIT GAME 3 (CRYPTARITHM WAR COMPLETION)
    */
   async submitGame3Score(sessionCode, teamNumber, correctCount, totalItems = 6) {
+    await this.ensureReady();
     const session = await this.getSession(sessionCode);
     if (!session || !session.teams || !session.teams[`team_${teamNumber}`]) {
       throw new Error('Data kelompok tidak ditemukan.');
@@ -810,6 +779,7 @@ class FirebaseService {
    * RESET SESSION (CLEAR SCORES TO ZERO & RESET LEADERBOARD)
    */
   async resetSession(sessionCode) {
+    await this.ensureReady();
     const session = await this.getSession(sessionCode);
     if (!session) return;
 
@@ -866,6 +836,7 @@ class FirebaseService {
    * Populates realistic points using 100-pt + speed bonus scale across all 3 games
    */
   async simulate8Teams(sessionCode) {
+    await this.ensureReady();
     const session = await this.getSession(sessionCode);
     if (!session) return null;
 
@@ -1040,7 +1011,7 @@ class FirebaseService {
   }
 
   /**
-   * LISTEN TO SESSION IN REALTIME (FIREBASE + CLOUD RELAY + STORAGE)
+   * LISTEN TO SESSION IN REALTIME (FIREBASE RTDB + STORAGE)
    */
   listenToSession(sessionCode, callback) {
     if (!sessionCode) return () => {};
@@ -1063,39 +1034,37 @@ class FirebaseService {
       }
     });
 
-    // 1. Single Live Firebase Listener per sessionCode
+    // 1. Single Live Firebase RTDB Listener per sessionCode
     if (!this.activeSubscriptions.has(cleanCode)) {
       let fbUnsub = null;
-      if (this.isFirebaseReady && this.db && this.fbRef && this.fbOnValue) {
-        try {
-          const sRef = this.fbRef(this.db, `sessions/${cleanCode}`);
-          fbUnsub = this.fbOnValue(sRef, (snap) => {
-            const val = typeof snap.val === 'function' ? snap.val() : null;
-            if (val) {
-              this.notifySessionUpdate(cleanCode, val);
-            }
-          });
-        } catch (e) {}
-      }
+      let isCancelled = false;
 
-      // 2. Global Cloud Relay SSE Listener
-      const cleanupSSE = this.listenToCloudRelay(cleanCode, (data) => {
-        if (data && data.code === cleanCode) {
-          this.notifySessionUpdate(cleanCode, data);
+      this.ensureReady().then(() => {
+        if (isCancelled) return;
+        if (this.isFirebaseReady && this.db && this.fbRef && this.fbOnValue) {
+          try {
+            const sRef = this.fbRef(this.db, `sessions/${cleanCode}`);
+            fbUnsub = this.fbOnValue(sRef, (snap) => {
+              const val = typeof snap.val === 'function' ? snap.val() : null;
+              if (val) {
+                this.notifySessionUpdate(cleanCode, val);
+              }
+            });
+          } catch (e) {
+            console.warn('Firebase onValue attach error:', e);
+          }
         }
       });
 
       this.activeSubscriptions.set(cleanCode, () => {
+        isCancelled = true;
         if (typeof fbUnsub === 'function') {
           try { fbUnsub(); } catch (e) {}
-        }
-        if (typeof cleanupSSE === 'function') {
-          try { cleanupSSE(); } catch (e) {}
         }
       });
     }
 
-    // 3. Storage event for multi-tab
+    // 2. Storage event for multi-tab
     const storageHandler = (e) => {
       if (e.key === `tc_session_${cleanCode}` && e.newValue) {
         try {
@@ -1123,7 +1092,7 @@ class FirebaseService {
   }
 
   /**
-   * GET SESSION (MEMORY -> LOCALSTORAGE -> FIREBASE -> CLOUD RELAY)
+   * GET SESSION (MEMORY -> LOCALSTORAGE -> FIREBASE RTDB)
    */
   async getSession(sessionCode) {
     if (!sessionCode) return null;
@@ -1141,13 +1110,12 @@ class FirebaseService {
       return local;
     }
 
-    // 3. Firebase RTDB with fast 1.5s timeout (never hangs)
+    // 3. Firebase RTDB
+    await this.ensureReady();
     if (this.isFirebaseReady && this.db && this.fbRef && this.fbGet) {
       try {
         const sRef = this.fbRef(this.db, `sessions/${cleanCode}`);
-        const fetchPromise = Promise.resolve(this.fbGet(sRef));
-        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
-        const snap = await Promise.race([fetchPromise, timeoutPromise]);
+        const snap = await this.fbGet(sRef);
         if (snap) {
           const val = typeof snap.val === 'function' ? snap.val() : (snap.exists && snap.exists() ? snap.val() : null);
           if (val) {
@@ -1158,22 +1126,10 @@ class FirebaseService {
             return val;
           }
         }
-      } catch (e) {}
-    }
-
-    // 4. Global Cloud Relay with fast timeout
-    try {
-      const relayPromise = this.fetchFromCloudRelay(cleanCode);
-      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
-      const cloudSession = await Promise.race([relayPromise, timeoutPromise]);
-      if (cloudSession) {
-        try {
-          localStorage.setItem(`tc_session_${cleanCode}`, JSON.stringify(cloudSession));
-        } catch (e) {}
-        this.sessionsCache.set(cleanCode, cloudSession);
-        return cloudSession;
+      } catch (e) {
+        console.warn('Firebase getSession error:', e);
       }
-    } catch (e) {}
+    }
 
     return null;
   }
