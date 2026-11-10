@@ -1,11 +1,11 @@
 /**
  * CHAMPIONS OF CALOR: CLASH OF SCIENCE
- * Game 3 - Cryptarithm War View (Formula Puzzles & Calculations)
- * 6 Quantitative Heat Challenges with In-App Scratchpad & Keypad
+ * Game 3 - Cryptarithm War View (Tantangan Hitung Rumus Kalor)
+ * 6 Quantitative Heat Physics Challenges with In-App Scratchpad & Keypad
  * Standardized Point System: 100 Base + 0-20 Speed Bonus per Puzzle
  */
 
-import { CRYPTARITHM_DATA } from '../data/cryptarithm-data.js';
+import { CRYPTARITHM_DATA, normalizeAnswer } from '../data/cryptarithm-data.js';
 import { SyncTimer } from '../components/timer.js';
 import { Scratchpad } from '../components/scratchpad.js';
 import { firebaseService } from '../services/firebase-service.js';
@@ -17,11 +17,10 @@ import { loadStyle } from '../utils/asset-loader.js';
 import { showInGameLeaderboardModal } from '../components/in-game-leaderboard-modal.js';
 
 export function renderGame3View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
-  loadStyle('css/game3.css?v=2.7');
+  loadStyle('css/game3.css?v=2.9');
 
   let currentIndex = 0;
-  let inputValues = {};
-  let activeInputId = null;
+  let userAnswer = '';
   let timerInstance = null;
   let scratchpadInstance = null;
   let sessionUnsubscribe = null;
@@ -34,7 +33,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
   // Ensure heartbeat is alive
   networkService.startHeartbeat(sessionCode, teamNumber);
 
-  // Realtime Session Listener (only force exit if teacher resets to LOBBY)
+  // Realtime Session Listener (exit if teacher resets to LOBBY)
   sessionUnsubscribe = firebaseService.listenToSession(sessionCode, (session) => {
     if (!session) return;
     if (session.currentPhase === 'LOBBY') {
@@ -46,7 +45,6 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
   // Resume progress if page was refreshed
   firebaseService.getSession(sessionCode).then((session) => {
     const answered = session?.teams?.[`team_${teamNumber}`]?.answeredQuestions?.game3 || {};
-    // Count already correct
     Object.values(answered).forEach((a) => {
       if (a?.isCorrect) correctCount++;
     });
@@ -57,7 +55,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
         break;
       }
       if (i === CRYPTARITHM_DATA.length - 1) {
-        currentIndex = CRYPTARITHM_DATA.length; // All done
+        currentIndex = CRYPTARITHM_DATA.length;
       }
     }
     loadPuzzle(currentIndex);
@@ -72,21 +70,22 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     }
 
     const data = CRYPTARITHM_DATA[index];
-    inputValues = {};
-    activeInputId = data.inputs[0]?.id || null;
+    userAnswer = '';
     isChecking = false;
 
     renderPuzzleUI(data);
   }
 
   function renderPuzzleUI(data) {
+    const diffClass = currentIndex < 2 ? 'easy' : currentIndex < 4 ? 'medium' : 'extreme';
+
     container.innerHTML = `
       <div class="tc-view tc-game-view tc-game3-view">
         <!-- Top Game HUD -->
         <div class="tc-game-hud">
           <div class="tc-hud-badge">
             <span class="tc-badge-lab">GAME 3 • CRYPTARITHM WAR</span>
-            <h2 class="tc-hud-title">TEKA-TEKI ANGKA KALOR (${currentIndex + 1}/${CRYPTARITHM_DATA.length})</h2>
+            <h2 class="tc-hud-title">HITUNG RUMUS KALOR (${currentIndex + 1}/${CRYPTARITHM_DATA.length})</h2>
           </div>
 
           <div class="tc-hud-center">
@@ -111,56 +110,75 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
         <!-- Banner Instruction -->
         <div class="tc-banner-instruction pulse">
           <span class="tc-fire-icon">🧮</span>
-          <span>Analisis parameter yang diketahui, hitung variabel kalor, dan temukan angka yang tepat!</span>
+          <span>Amati besaran yang diketahui, hitung menggunakan rumus kalor, dan masukkan angka hasil perhitungan!</span>
         </div>
 
         <!-- Puzzle Main Card -->
         <div class="tc-card tc-crypto-card">
           <div class="tc-crypto-top">
-            <span class="tc-crypto-formula-pill">${data.formula}</span>
-            <span class="tc-difficulty-badge ${currentIndex < 2 ? 'easy' : currentIndex < 4 ? 'medium' : 'extreme'}">${data.difficulty}</span>
+            <div class="tc-crypto-badges-left">
+              <span class="tc-crypto-formula-pill">📐 ${data.formula}</span>
+              <span class="tc-crypto-diff-pill ${diffClass}">${data.difficulty}</span>
+            </div>
+            <button type="button" class="tc-btn tc-btn-ghost tc-btn-sm" id="btn-toggle-formula-help" style="color:var(--tc-yellow); border:1px solid rgba(250,204,21,0.3); border-radius:var(--radius-full); font-size:0.82rem; padding:0.35rem 0.75rem;">
+              💡 Bantuan Rumus
+            </button>
           </div>
 
           <h3 class="tc-crypto-title">${data.title}</h3>
           <p class="tc-crypto-story">${data.story}</p>
 
-          <!-- Givens Parameters Grid -->
-          <div class="tc-givens-grid">
-            ${data.givens.map((g) => `
-              <div class="tc-given-chip">
-                <span class="tc-given-lbl">${g.label}:</span>
-                <span class="tc-given-val">${g.value}</span>
-              </div>
-            `).join('')}
+          <!-- Formula Help Box (Collapsible) -->
+          <div class="tc-formula-help-box" id="formula-help-box">
+            <div class="tc-formula-help-text">
+              💡 <strong>Rumus Bantu:</strong> ${data.formulaHelp}<br>
+              <span style="font-size:0.82rem; color:#cbd5e1;">${data.hint}</span>
+            </div>
           </div>
 
-          <!-- Equation Display Box -->
-          <div class="tc-equation-box">
-            <div class="tc-equation-text">${data.puzzleDisplay}</div>
-
-            <div class="tc-inputs-row">
-              ${data.inputs.map((inp) => `
-                <div class="tc-crypto-input-group">
-                  <span class="tc-crypto-input-lbl">${inp.label}:</span>
-                  <input 
-                    type="text" 
-                    class="tc-crypto-input-slot ${activeInputId === inp.id ? 'active-input' : ''}" 
-                    id="input-${inp.id}" 
-                    data-id="${inp.id}" 
-                    readonly 
-                    placeholder="${inp.placeholder || '?'}"
-                    value="${inputValues[inp.id] || ''}">
-                  <span class="tc-crypto-unit">${inp.unit}</span>
+          <!-- Givens Parameters Section -->
+          <div class="tc-givens-section">
+            <div class="tc-givens-title">
+              <span>📋</span>
+              <span>Besaran Yang Diketahui:</span>
+            </div>
+            <div class="tc-givens-grid">
+              ${data.givens.map((g) => `
+                <div class="tc-given-chip">
+                  <span class="tc-given-icon">${g.icon || '📌'}</span>
+                  <div class="tc-given-details">
+                    <span class="tc-given-lbl">${g.label}</span>
+                    <span class="tc-given-val">${g.value}</span>
+                  </div>
                 </div>
               `).join('')}
             </div>
           </div>
 
+          <!-- Target Answer Slot Box -->
+          <div class="tc-target-answer-box" id="target-answer-box">
+            <div class="tc-target-prompt">${data.questionPrompt}</div>
+            <div class="tc-target-input-row">
+              <span class="tc-target-var-label">${data.targetVariable} =</span>
+              <input 
+                type="text" 
+                inputmode="numeric" 
+                class="tc-target-input-field" 
+                id="target-answer-input" 
+                placeholder="Jawaban..." 
+                maxlength="10" 
+                autocomplete="off"
+                value="${userAnswer}"
+              />
+              <span class="tc-target-unit-label">${data.targetUnit}</span>
+            </div>
+          </div>
+
           <!-- On-Screen Numeric Keypad -->
-          <div class="tc-numpad-container">
-            <div class="tc-numpad-grid">
+          <div class="tc-keypad-wrap">
+            <div class="tc-keypad-grid">
               ${['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => `
-                <button type="button" class="tc-numpad-btn ${k === 'C' ? 'clear' : k === '⌫' ? 'backspace' : ''}" data-key="${k === '⌫' ? 'BACK' : k}">
+                <button type="button" class="tc-numpad-btn ${k === 'C' ? 'clear-btn' : k === '⌫' ? 'action-btn' : ''}" data-key="${k === '⌫' ? 'BACK' : k}">
                   ${k}
                 </button>
               `).join('')}
@@ -168,9 +186,9 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
           </div>
 
           <!-- Actions -->
-          <div class="tc-crypto-actions">
+          <div class="tc-crypto-action-bar">
             <button id="btn-toggle-scratch" class="tc-btn tc-btn-secondary" type="button">
-              <span>📝 Buka Kertas Cakar</span>
+              <span>📝 Kertas Cakar Digital</span>
             </button>
             <button id="btn-check-crypto" class="tc-btn tc-btn-primary tc-btn-large" type="button">
               <span>🔒 KUNCI & PERIKSA JAWABAN</span>
@@ -181,19 +199,19 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
 
         <!-- Floating Slide-up Scratchpad Drawer -->
         <div class="tc-scratchpad-drawer" id="scratchpad-drawer">
-          <div class="tc-scratchpad-header">
+          <div class="tc-scratch-header">
             <div class="tc-scratch-title">
               <span>✏️</span>
               <span>Kertas Cakar Digital (Hitung Rumus Kalor)</span>
             </div>
-            <div class="tc-scratch-actions">
-              <button id="btn-scratch-undo" class="tc-btn-icon" type="button" title="Undo">↩</button>
-              <button id="btn-scratch-clear" class="tc-btn-icon" type="button" title="Bersihkan">🗑️</button>
-              <button id="btn-scratch-close" class="tc-btn-icon" type="button" title="Tutup">✕</button>
+            <div class="tc-scratch-tools">
+              <button id="btn-scratch-undo" class="tc-btn-icon" type="button" title="Urungkan Coretan">↩</button>
+              <button id="btn-scratch-clear" class="tc-btn-icon" type="button" title="Bersihkan Kertas">🗑️</button>
+              <button id="btn-scratch-close" class="tc-btn-icon" type="button" title="Tutup Kertas Cakar">✕</button>
             </div>
           </div>
-          <div class="tc-scratchpad-body">
-            <canvas id="scratch-canvas"></canvas>
+          <div class="tc-scratch-body">
+            <canvas class="tc-scratch-canvas" id="scratch-canvas"></canvas>
           </div>
         </div>
       </div>
@@ -209,8 +227,8 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
         if (rem <= 10 && rem > 0) audio.playWarning();
       },
       onTimeUp: () => {
-        toast.warning('Waktu teka-teki ini telah habis! Jawaban diperiksa otomatis.');
-        evaluatePuzzle(data, true);
+        toast.warning('Waktu tantangan telah habis! Jawaban diperiksa otomatis.');
+        evaluateAnswer(data, true);
       }
     });
     timerInstance.mount(timerBox);
@@ -233,9 +251,20 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
       btnHudReset.addEventListener('click', handleResetClick);
     }
 
-    // Attach Keypad & Scratchpad
+    // Attach Formula Help Toggle
+    const helpBtn = container.querySelector('#btn-toggle-formula-help');
+    const helpBox = container.querySelector('#formula-help-box');
+    if (helpBtn && helpBox) {
+      helpBtn.addEventListener('click', () => {
+        audio.playClick();
+        helpBox.classList.toggle('show');
+        helpBtn.textContent = helpBox.classList.contains('show') ? '✕ Tutup Bantuan' : '💡 Bantuan Rumus';
+      });
+    }
+
+    // Attach Scratchpad & Keypad Interactions
     attachScratchpad();
-    attachKeypadInteractions(data);
+    attachInputAndKeypad(data);
   }
 
   function handleResetClick() {
@@ -297,111 +326,114 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     });
   }
 
-  function attachKeypadInteractions(data) {
-    const keypad = container.querySelector('.tc-numpad-grid');
-    const inputSlots = container.querySelectorAll('.tc-crypto-input-slot');
+  function attachInputAndKeypad(data) {
+    const inputField = container.querySelector('#target-answer-input');
+    const answerBox = container.querySelector('#target-answer-box');
+    const keypad = container.querySelector('.tc-keypad-grid');
     const checkBtn = container.querySelector('#btn-check-crypto');
 
-    // Click input slot to focus
-    inputSlots.forEach((slot) => {
-      slot.addEventListener('click', () => {
-        audio.playClick();
-        activeInputId = slot.dataset.id;
-        inputSlots.forEach((s) => s.classList.remove('active-input'));
-        slot.classList.add('active-input');
+    if (inputField) {
+      inputField.addEventListener('focus', () => {
+        if (answerBox) answerBox.classList.add('focused');
       });
-    });
-
-    // Keypad clicks
-    keypad.addEventListener('click', (e) => {
-      if (isChecking) return;
-      const btn = e.target.closest('.tc-numpad-btn');
-      if (!btn || !activeInputId) return;
-      audio.playClick();
-
-      const key = btn.dataset.key;
-      let currentVal = inputValues[activeInputId] || '';
-
-      if (key === 'C') {
-        inputValues[activeInputId] = '';
-      } else if (key === 'BACK') {
-        inputValues[activeInputId] = currentVal.slice(0, -1);
-      } else {
-        const inpConfig = data.inputs.find((i) => i.id === activeInputId);
-        const maxLen = inpConfig?.maxLength || 6;
-        if (currentVal.length < maxLen) {
-          inputValues[activeInputId] = currentVal + key;
+      inputField.addEventListener('blur', () => {
+        if (answerBox) answerBox.classList.remove('focused');
+      });
+      inputField.addEventListener('input', (e) => {
+        userAnswer = e.target.value;
+      });
+      inputField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          checkBtn.click();
         }
-      }
+      });
+    }
 
-      // Update input slot value
-      const targetSlot = container.querySelector(`#input-${activeInputId}`);
-      if (targetSlot) {
-        targetSlot.value = inputValues[activeInputId];
-      }
-    });
+    // Keypad Clicks
+    if (keypad) {
+      keypad.addEventListener('click', (e) => {
+        if (isChecking) return;
+        const btn = e.target.closest('.tc-numpad-btn');
+        if (!btn) return;
+        audio.playClick();
 
-    // Check Answers
-    checkBtn.addEventListener('click', () => {
-      if (isChecking) return;
+        const key = btn.dataset.key;
+        if (key === 'C') {
+          userAnswer = '';
+        } else if (key === 'BACK') {
+          userAnswer = userAnswer.slice(0, -1);
+        } else {
+          if (userAnswer.length < 10) {
+            userAnswer += key;
+          }
+        }
 
-      // Ensure all inputs filled
-      for (const inp of data.inputs) {
-        if (!inputValues[inp.id] || inputValues[inp.id].trim() === '') {
-          toast.warning(`Silakan masukkan angka untuk "${inp.label}" terlebih dahulu.`);
+        if (inputField) {
+          inputField.value = userAnswer;
+        }
+      });
+    }
+
+    // Check Answer Button
+    if (checkBtn) {
+      checkBtn.addEventListener('click', () => {
+        if (isChecking) return;
+        if (!userAnswer || userAnswer.trim() === '') {
+          audio.playWarning();
+          toast.warning('Silakan masukkan angka jawaban Anda terlebih dahulu.');
+          if (inputField) inputField.focus();
           return;
         }
-      }
-
-      evaluatePuzzle(data, false);
-    });
+        audio.playClick();
+        evaluateAnswer(data, false);
+      });
+    }
   }
 
-  async function evaluatePuzzle(data, isTimeout = false) {
+  async function evaluateAnswer(data, isTimeout = false) {
     if (isChecking) return;
     isChecking = true;
 
     const remaining = timerInstance ? timerInstance.getRemainingSeconds() : 0;
     if (timerInstance) timerInstance.stop();
 
-    // Disable buttons to lock inputs
-    const allBtns = container.querySelectorAll('.tc-numpad-btn, #btn-check-crypto');
+    // Disable buttons
+    const allBtns = container.querySelectorAll('.tc-numpad-btn, #btn-check-crypto, #target-answer-input');
     allBtns.forEach((b) => { b.disabled = true; });
 
-    let isAllCorrect = !isTimeout;
-    if (!isTimeout) {
-      for (const inp of data.inputs) {
-        const userVal = (inputValues[inp.id] || '').trim();
-        const expected = String(inp.expected).trim();
-        if (userVal !== expected) {
-          isAllCorrect = false;
-        }
-      }
-    }
+    const normalizedUser = normalizeAnswer(userAnswer);
+    const normalizedExpected = normalizeAnswer(data.expectedAnswer);
+    const normalizedAccepted = (data.acceptedAnswers || []).map(normalizeAnswer);
+
+    const isCorrect = !isTimeout && (
+      normalizedUser === normalizedExpected ||
+      normalizedAccepted.includes(normalizedUser)
+    );
 
     try {
       const res = await firebaseService.submitQuestionAnswer(sessionCode, teamNumber, 'game3', data.id, {
-        isCorrect: isAllCorrect,
+        isCorrect,
         remainingSeconds: remaining,
         totalSeconds: PUZZLE_DURATION_SECONDS,
-        answerData: { inputValues, isTimeout }
+        answerData: { userAnswer, isCorrect, isTimeout }
       });
 
-      if (isAllCorrect) {
-        audio.playCorrect();
+      if (isCorrect) {
+        audio.playSuccess();
         correctCount++;
-        toast.success(`🎉 TEPAT! ${res.scoreResult.breakdownText}`);
+        toast.success(`🎉 TEPAT SEKALI! ${res.scoreResult.breakdownText}`);
       } else {
-        audio.playWrong();
-        toast.error('❌ Angka belum tepat. Simak langkah solusi rumus kalor berikut!');
+        audio.playFailure();
+        toast.error('❌ Angka belum tepat. Simak pembahasan rumus kalor berikut!');
       }
 
       setTimeout(() => {
-        showSolutionModal(data, isAllCorrect, res.scoreResult);
-      }, 700);
+        showSolutionModal(data, isCorrect, res.scoreResult);
+      }, 600);
     } catch (err) {
       toast.error('Gagal mengirim skor: ' + err.message);
-      showSolutionModal(data, isAllCorrect, { totalPoints: isAllCorrect ? 100 : 0 });
+      showSolutionModal(data, isCorrect, { totalPoints: isCorrect ? 100 : 0, speedBonus: 0 });
     }
   }
 
@@ -411,23 +443,26 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
            🏆 +${scoreResult?.totalPoints || 100} POIN (100 Jawaban Benar ${scoreResult?.speedBonus ? `+ ${scoreResult.speedBonus} Bonus Kecepatan` : ''})
          </div>`
       : `<div style="background:rgba(239,68,68,0.15); border:1.5px solid #ef4444; color:#f87171; padding:0.6rem 1rem; border-radius:10px; font-weight:800; font-family:var(--font-mono); margin-bottom:1rem; font-size:1.1rem; text-align:center;">
-           ❌ +0 POIN (Perhitungan Belum Tepat)
+           ❌ +0 POIN (Jawaban Kamu: ${userAnswer || '-'} | Kunci: ${data.expectedAnswer} ${data.targetUnit})
          </div>`;
 
     const content = `
-      <div class="tc-modal-explanation">
+      <div style="font-size:0.95rem; color:#f1f5f9; line-height:1.6;">
         ${pointsBadge}
 
-        <p style="font-size:1rem; color:var(--tc-sky); margin-bottom:0.85rem; font-weight:700;">
-          Langkah Penyelesaian Rumus ${data.formula}:
-        </p>
-        <ol style="margin-left:1.25rem; display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1.25rem;">
-          ${data.solutionSteps.map((step) => `
-            <li style="color:var(--tc-cream); line-height:1.5;">${step}</li>
-          `).join('')}
-        </ol>
-        <div style="background:rgba(250,204,21,0.12); border:1px solid rgba(250,204,21,0.35); padding:0.75rem 1rem; border-radius:10px; color:var(--tc-yellow); font-size:0.9rem;">
-          💡 <strong>Konsep IPA:</strong> ${data.keyConcept}
+        <div style="background:rgba(56,189,248,0.1); border-left:3px solid var(--tc-sky); padding:0.85rem 1rem; border-radius:8px; margin-bottom:1rem;">
+          <h4 style="color:var(--tc-sky); margin-bottom:0.5rem; font-size:0.92rem; font-weight:800;">
+            LANGKAH PENYELESAIAN RUMUS (${data.formula}):
+          </h4>
+          <ol style="margin-left:1.25rem; display:flex; flex-direction:column; gap:0.45rem; padding:0; margin-bottom:0;">
+            ${data.solutionSteps.map((step) => `
+              <li style="color:#e2e8f0; font-size:0.88rem; line-height:1.5;">${step}</li>
+            `).join('')}
+          </ol>
+        </div>
+
+        <div style="background:rgba(250,204,21,0.12); border:1px solid rgba(250,204,21,0.35); padding:0.75rem 1rem; border-radius:8px; color:var(--tc-yellow); font-size:0.88rem;">
+          💡 <strong>Konsep IPA Kalor:</strong> ${data.keyConcept}
         </div>
       </div>
     `;
@@ -435,7 +470,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     showLabModal({
       title: `Solusi Perhitungan: ${data.title}`,
       contentHtml: content,
-      confirmText: currentIndex < CRYPTARITHM_DATA.length - 1 ? 'Soal Berikutnya ➔' : 'Tuntaskan Babak 2 🏆',
+      confirmText: currentIndex < CRYPTARITHM_DATA.length - 1 ? 'Soal Berikutnya ➔' : 'Tuntaskan Babak 3 🏆',
       onConfirm: () => {
         isChecking = false;
         currentIndex++;
@@ -465,7 +500,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
             <div class="tc-badge-lab">SELURUH BABAK PERMAINAN TUNTAS</div>
             <h2 style="font-size:1.85rem; margin:0.5rem 0;">Cryptarithm War Berhasil Diselesaikan!</h2>
             <p style="color:#94a3b8; margin-bottom:1rem; font-size:0.95rem;">
-              Kelompok ${teamNumber} berhasil memecahkan ${correctCount} dari ${CRYPTARITHM_DATA.length} teka-teki rumus kalor.
+              Kelompok ${teamNumber} berhasil memecahkan ${correctCount} dari ${CRYPTARITHM_DATA.length} tantangan rumus kalor.
             </p>
             <div style="font-size:2.5rem; font-weight:800; color:var(--tc-orange); margin-bottom:0.5rem; font-family:var(--font-mono);">
               +${res.score} POIN

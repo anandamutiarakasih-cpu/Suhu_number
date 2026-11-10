@@ -1,7 +1,7 @@
 /**
  * CHAMPIONS OF CALOR: CLASH OF SCIENCE
  * Game 1 - Number Chains View (Rantai Peristiwa Kalor)
- * 5 Thermal Process Stages with Direct Number Assignment, Question-Level Locking & Realtime Scoring
+ * Redesigned: Direct Up/Down Reordering, Intuitive Tactile Controls, and Fair Partial Scoring
  */
 
 import { NUMBER_CHAINS_DATA } from '../data/chains-data.js';
@@ -15,11 +15,10 @@ import { loadStyle } from '../utils/asset-loader.js';
 import { showInGameLeaderboardModal } from '../components/in-game-leaderboard-modal.js';
 
 export function renderGame1View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
-  loadStyle('css/game1.css?v=2.7');
+  loadStyle('css/game1.css?v=2.8');
 
   let currentStageIndex = 0;
-  let stageCards = [];
-  let userOrder = {}; // cardIdx (0..4) -> step (1..5)
+  let currentSteps = []; // array of 5 step objects in current user order
   let timerInstance = null;
   let sessionUnsubscribe = null;
   let correctStagesCount = 0;
@@ -28,10 +27,10 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
   let countdownTimer = null;
   const STAGE_DURATION_SECONDS = 90;
 
-  // Ensure heartbeat is alive
+  // Heartbeat active
   networkService.startHeartbeat(sessionCode, teamNumber);
 
-  // Listen for phase change from Teacher (e.g. if teacher resets to LOBBY or forces FINISHED)
+  // Realtime session phase listener
   sessionUnsubscribe = firebaseService.listenToSession(sessionCode, (session) => {
     if (!session) return;
     if (session.currentPhase === 'LOBBY' || session.currentPhase === 'FINISHED') {
@@ -40,10 +39,9 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     }
   });
 
-  // Check existing session progress to resume where left off
+  // Resume progress if page was refreshed
   firebaseService.getSession(sessionCode).then((session) => {
     const answered = session?.teams?.[`team_${teamNumber}`]?.answeredQuestions?.game1 || {};
-    // Find next unanswered stage
     for (let i = 0; i < NUMBER_CHAINS_DATA.length; i++) {
       if (!answered[NUMBER_CHAINS_DATA[i].id]) {
         currentStageIndex = i;
@@ -53,7 +51,7 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
         correctStagesCount++;
       }
       if (i === NUMBER_CHAINS_DATA.length - 1) {
-        currentStageIndex = NUMBER_CHAINS_DATA.length; // all done
+        currentStageIndex = NUMBER_CHAINS_DATA.length; // All done
       }
     }
     loadStage(currentStageIndex);
@@ -68,44 +66,11 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     }
 
     const data = NUMBER_CHAINS_DATA[index];
-    // Shuffle cards so order is randomized
-    stageCards = [...data.correctOrder].sort(() => Math.random() - 0.5);
-
-    // Reset user order state for the 5 cards
-    userOrder = { 0: null, 1: null, 2: null, 3: null, 4: null };
+    // Start with a randomized initial order of the 5 steps
+    currentSteps = [...data.steps].sort(() => Math.random() - 0.5);
     isChecking = false;
 
     renderStageUI(data);
-  }
-
-  function renderPreviewSteps() {
-    return [1, 2, 3, 4, 5].map((step) => {
-      const foundCardIdx = Object.keys(userOrder).find((k) => userOrder[k] === step);
-      const isFilled = foundCardIdx !== undefined && userOrder[foundCardIdx] !== null;
-      const cardNum = isFilled ? parseInt(foundCardIdx, 10) : null;
-      const letter = isFilled ? String.fromCharCode(65 + cardNum) : '';
-      const text = isFilled ? stageCards[cardNum] : 'Belum ditentukan — sentuh angka di kartu peristiwa untuk mengisi langkah ini';
-
-      return `
-        <div class="tc-preview-step-row ${isFilled ? 'filled' : 'empty'}">
-          <div class="tc-preview-step-badge">
-            <span class="tc-preview-step-digit">${step}</span>
-            <span class="tc-preview-step-lbl">Langkah</span>
-          </div>
-          <div class="tc-preview-step-content">
-            ${isFilled ? `
-              <div class="tc-preview-event-tag">📌 PERISTIWA ${letter}</div>
-              <div class="tc-preview-text">${text}</div>
-            ` : `
-              <div class="tc-preview-empty-hint">⏳ ${text}</div>
-            `}
-          </div>
-          <div class="tc-preview-status-icon">
-            ${isFilled ? '<span class="tc-check-dot" title="Sudah terisi">✓</span>' : '<span class="tc-wait-dot" title="Menunggu pilihan">⋯</span>'}
-          </div>
-        </div>
-      `;
-    }).join('');
   }
 
   function renderStageUI(data) {
@@ -115,7 +80,7 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
         <div class="tc-game-hud">
           <div class="tc-hud-badge">
             <span class="tc-badge-lab">GAME 1 • NUMBER CHAINS</span>
-            <h2 class="tc-hud-title">RANTAI PERISTIWA KALOR (${currentStageIndex + 1}/${NUMBER_CHAINS_DATA.length})</h2>
+            <h2 class="tc-hud-title">RANTAI PROSES KALOR (${currentStageIndex + 1}/${NUMBER_CHAINS_DATA.length})</h2>
           </div>
 
           <div class="tc-hud-center">
@@ -137,110 +102,36 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
           </div>
         </div>
 
-        <!-- Banner Instruction -->
-        <div class="tc-banner-instruction pulse">
-          <span class="tc-fire-icon">🔥</span>
-          <span>Tentukan nomor urutan (1 sampai 5) untuk setiap peristiwa di bawah ini agar menjadi runtutan sains yang tepat!</span>
-        </div>
-
         <!-- Stage Header & Story -->
         <div class="tc-chain-stage-header">
+          <div class="tc-chain-badge-pill">${data.badge} • ${data.topic}</div>
           <h3 class="tc-chain-title">${data.title}</h3>
-          <p class="tc-chain-story">${data.story}</p>
-          <div class="tc-chain-hint-box">
+          <div class="tc-chain-story-box">
+            ${data.story}
+          </div>
+          <div class="tc-chain-hint-pill">
             <span>💡</span>
             <span><strong>Petunjuk Guru:</strong> ${data.hint}</span>
           </div>
         </div>
 
-        <!-- How To Instruction Pill -->
-        <div class="tc-chain-howto-pill">
-          <span>👆 Sentuh angka <strong>1, 2, 3, 4, atau 5</strong> pada kotak setiap peristiwa untuk memasukkan urutan kronologisnya.</span>
+        <!-- How To Instruction Bar -->
+        <div class="tc-chain-instruction-bar">
+          <span>Gunakan tombol <strong>[▲ Naik]</strong> atau <strong>[▼ Turun]</strong> untuk menyusun peristiwa dari <strong>Langkah 1 (Paling Awal)</strong> hingga <strong>Langkah 5 (Paling Akhir)</strong>.</span>
         </div>
 
-        <!-- 5 Event Cards with Direct Number Choice Grid -->
-        <div class="tc-chain-list" id="chain-card-list">
-          ${stageCards.map((text, idx) => {
-            const letter = String.fromCharCode(65 + idx);
-            const currentChosen = userOrder[idx];
-            return `
-              <div class="tc-chain-card ${currentChosen ? 'filled' : ''}" id="chain-card-${idx}">
-                <div class="tc-card-top-row">
-                  <div class="tc-event-tag">
-                    <span class="tc-event-icon">📌</span>
-                    <span>PERISTIWA ${letter}</span>
-                  </div>
-                  <div class="tc-status-tag" id="status-tag-${idx}">
-                    ${currentChosen ? `
-                      <span class="tc-badge-filled">
-                        <span>Langkah</span>
-                        <strong>#${currentChosen}</strong>
-                      </span>
-                    ` : `
-                      <span class="tc-badge-empty">Pilih nomor urutan</span>
-                    `}
-                  </div>
-                </div>
-
-                <p class="tc-card-desc">${text}</p>
-
-                <!-- Responsive Tactile Number Assignment Box -->
-                <div class="tc-card-answer-box ${currentChosen ? 'active-box' : ''}">
-                  <div class="tc-answer-header">
-                    <span class="tc-answer-title">
-                      <span class="tc-step-icon">🔢</span>
-                      <span>Tentukan Posisi Langkah:</span>
-                    </span>
-                    <span class="tc-chosen-pill" id="chosen-pill-${idx}">
-                      <span>Pilihan:</span>
-                      <strong>${currentChosen ? `Langkah ${currentChosen}` : 'Belum Dipilih'}</strong>
-                    </span>
-                  </div>
-
-                  <div class="tc-btn-group-nums" data-card-idx="${idx}">
-                    ${[1, 2, 3, 4, 5].map((num) => `
-                      <button
-                        type="button"
-                        class="tc-num-choice-btn ${currentChosen === num ? 'active' : ''}"
-                        data-step-num="${num}"
-                        title="Jadikan Peristiwa ${letter} sebagai Langkah ${num}"
-                      >
-                        <span class="tc-num-digit">${num}</span>
-                        <span class="tc-num-label">Langkah</span>
-                        <span class="tc-num-check">✓</span>
-                      </button>
-                    `).join('')}
-                  </div>
-
-                  <div class="tc-answer-feedback">
-                    <span class="tc-fb-icon">💡</span>
-                    <span class="tc-fb-text" id="fb-text-${idx}">
-                      ${currentChosen
-                        ? `Peristiwa ${letter} ditugaskan pada <strong>Langkah ${currentChosen}</strong>.`
-                        : `Klik salah satu tombol angka 1-5 di atas untuk menetapkan nomor urutan peristiwa ini.`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            `;
-          }).join('')}
+        <!-- 5 Interactive Reorderable Cards -->
+        <div class="tc-reorder-list" id="reorder-cards-list">
+          ${renderCardsHTML()}
         </div>
 
-        <!-- Live Assembled Chain Sequence Preview Box -->
-        <div class="tc-chain-preview-box">
-          <div class="tc-preview-title">
-            <span>📋</span>
-            <span>RANGKAIAN URUTAN PROSES SAINS YANG TERBENTUK:</span>
-          </div>
-          <div class="tc-preview-steps" id="assembled-preview-steps">
-            ${renderPreviewSteps()}
-          </div>
-        </div>
-
-        <!-- Submit & Verification Button -->
-        <div class="tc-chain-actions">
+        <!-- Bottom Action Bar -->
+        <div class="tc-chain-bottom-bar">
+          <button type="button" class="tc-btn tc-btn-secondary" id="btn-shuffle-chain">
+            <span>🔀 Acak Ulang Posisi</span>
+          </button>
           <button type="button" class="tc-btn tc-btn-primary tc-btn-large" id="btn-submit-chain">
-            <span>🔒 KUNCI & PERIKSA JAWABAN SAINS</span>
+            <span>🔒 KUNCI & PERIKSA URUTAN SAINS</span>
             <span class="tc-btn-arrow">➔</span>
           </button>
         </div>
@@ -254,7 +145,7 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
       detachNet = networkService.attachBadge(netWrap);
     }
 
-    // In-game Leaderboard button handler
+    // In-game Leaderboard button
     const btnInGameLB = container.querySelector('#btn-in-game-lb');
     if (btnInGameLB) {
       btnInGameLB.addEventListener('click', () => {
@@ -262,13 +153,13 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
       });
     }
 
-    // Dashboard reset handler
+    // Dashboard reset button
     const resetBtn = container.querySelector('#btn-hud-reset');
     if (resetBtn) {
       resetBtn.addEventListener('click', handleResetClick);
     }
 
-    // Initialize Timer for this stage
+    // Initialize Timer
     const timerBox = container.querySelector('#game1-timer-container');
     if (timerInstance) timerInstance.stop();
 
@@ -278,123 +169,111 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
         if (rem <= 10 && rem > 0) audio.playWarning();
       },
       onTimeUp: () => {
-        toast.warning('Waktu tahap ini telah habis! Jawaban saat ini dikunci otomatis.');
-        evaluateAnswer(true);
+        toast.warning('Waktu tahap ini habis! Urutan saat ini otomatis dikunci & diperiksa.');
+        evaluateSequence(true);
       }
     });
     timerInstance.mount(timerBox);
     timerInstance.start();
 
-    // Attach Button Click Handlers for the 5-button step choice
-    const numGroups = container.querySelectorAll('.tc-btn-group-nums');
-    numGroups.forEach((group) => {
-      const cardIdx = parseInt(group.dataset.cardIdx, 10);
-      const letter = String.fromCharCode(65 + cardIdx);
-
-      group.addEventListener('click', (e) => {
-        if (isChecking) return;
-        const btn = e.target.closest('.tc-num-choice-btn');
-        if (!btn) return;
-
-        audio.playClick();
-        const chosenStep = parseInt(btn.dataset.stepNum, 10);
-
-        // Check if another card already has this step assigned
-        Object.keys(userOrder).forEach((k) => {
-          if (parseInt(k, 10) !== cardIdx && userOrder[k] === chosenStep) {
-            userOrder[k] = null;
-            updateCardVisuals(parseInt(k, 10));
-          }
-        });
-
-        // Toggle or set
-        if (userOrder[cardIdx] === chosenStep) {
-          userOrder[cardIdx] = null;
-        } else {
-          userOrder[cardIdx] = chosenStep;
-        }
-
-        updateCardVisuals(cardIdx);
-
-        // Update Live Assembled Sequence Box
-        const previewBox = container.querySelector('#assembled-preview-steps');
-        if (previewBox) {
-          previewBox.innerHTML = renderPreviewSteps();
-        }
-      });
-    });
-
-    // Submit Button Handler
-    const submitBtn = container.querySelector('#btn-submit-chain');
-    submitBtn.addEventListener('click', () => {
-      if (isChecking) return;
-      audio.playClick();
-
-      // Validate all 5 cards have distinct steps 1..5
-      const chosenValues = Object.values(userOrder).filter((v) => v !== null);
-      if (chosenValues.length < 5) {
-        toast.warning('Lengkapi urutan semua 5 peristiwa (Langkah 1 sampai 5) sebelum mengunci jawaban!');
-        return;
-      }
-
-      evaluateAnswer(false);
-    });
+    // Attach Card Reordering Interactions
+    attachReorderInteractions(data);
   }
 
-  function updateCardVisuals(cardIdx) {
-    const cardEl = container.querySelector(`#chain-card-${cardIdx}`);
-    const statusTag = container.querySelector(`#status-tag-${cardIdx}`);
-    const chosenPill = container.querySelector(`#chosen-pill-${cardIdx}`);
-    const answerBox = cardEl ? cardEl.querySelector('.tc-card-answer-box') : null;
-    const fbText = container.querySelector(`#fb-text-${cardIdx}`);
-    const groupEl = container.querySelector(`.tc-btn-group-nums[data-card-idx="${cardIdx}"]`);
-    const letter = String.fromCharCode(65 + cardIdx);
-    const chosen = userOrder[cardIdx];
+  function renderCardsHTML() {
+    return currentSteps.map((item, idx) => {
+      const stepNum = idx + 1;
+      const isFirst = idx === 0;
+      const isLast = idx === currentSteps.length - 1;
 
-    if (!cardEl) return;
+      return `
+        <div class="tc-reorder-card" data-idx="${idx}" id="step-card-${idx}">
+          <div class="tc-reorder-num-badge">
+            <span class="tc-badge-step-digit">${stepNum}</span>
+            <span class="tc-badge-step-lbl">${isFirst ? 'Awal' : isLast ? 'Akhir' : 'Langkah'}</span>
+          </div>
 
-    if (chosen) {
-      cardEl.classList.add('filled');
-      if (answerBox) answerBox.classList.add('active-box');
-      if (statusTag) {
-        statusTag.innerHTML = `
-          <span class="tc-badge-filled">
-            <span>Langkah</span>
-            <strong>#${chosen}</strong>
-          </span>
-        `;
+          <div class="tc-reorder-content">
+            <div class="tc-reorder-heading">
+              <span class="tc-reorder-icon">${item.icon}</span>
+              <span>${item.title}</span>
+            </div>
+            <p class="tc-reorder-desc">${item.desc}</p>
+          </div>
+
+          <div class="tc-reorder-ctrls">
+            <button type="button" class="tc-move-btn btn-move-up" data-idx="${idx}" ${isFirst ? 'disabled' : ''} title="Pindahkan ke langkah lebih awal">
+              ▲
+            </button>
+            <button type="button" class="tc-move-btn btn-move-down" data-idx="${idx}" ${isLast ? 'disabled' : ''} title="Pindahkan ke langkah berikutnya">
+              ▼
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function attachReorderInteractions(data) {
+    const listEl = container.querySelector('#reorder-cards-list');
+    const submitBtn = container.querySelector('#btn-submit-chain');
+    const shuffleBtn = container.querySelector('#btn-shuffle-chain');
+
+    // Up / Down Button Clicks via Event Delegation
+    listEl.addEventListener('click', (e) => {
+      if (isChecking) return;
+
+      const upBtn = e.target.closest('.btn-move-up');
+      const downBtn = e.target.closest('.btn-move-down');
+
+      if (upBtn && !upBtn.disabled) {
+        audio.playClick();
+        const idx = parseInt(upBtn.dataset.idx, 10);
+        if (idx > 0) {
+          // Swap idx with idx - 1
+          const temp = currentSteps[idx];
+          currentSteps[idx] = currentSteps[idx - 1];
+          currentSteps[idx - 1] = temp;
+          refreshCardsUI();
+        }
+      } else if (downBtn && !downBtn.disabled) {
+        audio.playClick();
+        const idx = parseInt(downBtn.dataset.idx, 10);
+        if (idx < currentSteps.length - 1) {
+          // Swap idx with idx + 1
+          const temp = currentSteps[idx];
+          currentSteps[idx] = currentSteps[idx + 1];
+          currentSteps[idx + 1] = temp;
+          refreshCardsUI();
+        }
       }
-      if (chosenPill) {
-        chosenPill.innerHTML = `<span>Pilihan:</span><strong>Langkah ${chosen}</strong>`;
-      }
-      if (fbText) {
-        fbText.innerHTML = `Peristiwa ${letter} ditugaskan pada <strong>Langkah ${chosen}</strong>.`;
-      }
-    } else {
-      cardEl.classList.remove('filled');
-      if (answerBox) answerBox.classList.remove('active-box');
-      if (statusTag) {
-        statusTag.innerHTML = `<span class="tc-badge-empty">Pilih nomor urutan</span>`;
-      }
-      if (chosenPill) {
-        chosenPill.innerHTML = `<span>Pilihan:</span><strong>Belum Dipilih</strong>`;
-      }
-      if (fbText) {
-        fbText.innerHTML = `Klik salah satu tombol angka 1-5 di atas untuk menetapkan nomor urutan peristiwa ini.`;
-      }
+    });
+
+    // Shuffle Button
+    if (shuffleBtn) {
+      shuffleBtn.addEventListener('click', () => {
+        if (isChecking) return;
+        audio.playClick();
+        currentSteps.sort(() => Math.random() - 0.5);
+        refreshCardsUI();
+        toast.info('Urutan kartu diacak ulang.');
+      });
     }
 
-    // Update active button state
-    if (groupEl) {
-      const btns = groupEl.querySelectorAll('.tc-num-choice-btn');
-      btns.forEach((b) => {
-        const stepNum = parseInt(b.dataset.stepNum, 10);
-        if (stepNum === chosen) {
-          b.classList.add('active');
-        } else {
-          b.classList.remove('active');
-        }
+    // Submit & Lock Button
+    if (submitBtn) {
+      submitBtn.addEventListener('click', () => {
+        if (isChecking) return;
+        audio.playClick();
+        evaluateSequence(false);
       });
+    }
+  }
+
+  function refreshCardsUI() {
+    const listEl = container.querySelector('#reorder-cards-list');
+    if (listEl) {
+      listEl.innerHTML = renderCardsHTML();
     }
   }
 
@@ -419,7 +298,7 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     });
   }
 
-  async function evaluateAnswer(isTimeout = false) {
+  async function evaluateSequence(isTimeout = false) {
     if (isChecking) return;
     isChecking = true;
 
@@ -427,50 +306,75 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     const remaining = timerInstance ? timerInstance.getRemainingSeconds() : 0;
     if (timerInstance) timerInstance.stop();
 
-    // Check user order matching correctOrder
-    const userOrderedText = [1, 2, 3, 4, 5].map((step) => {
-      const cardIdx = Object.keys(userOrder).find((k) => userOrder[k] === step);
-      return cardIdx !== undefined ? stageCards[cardIdx] : null;
-    });
-
-    const isCorrect = !isTimeout && userOrderedText.every((txt, idx) => txt === data.correctOrder[idx]);
-
-    // Disable all choice buttons so locked answers cannot be modified
-    const allBtns = container.querySelectorAll('.tc-num-choice-btn, #btn-submit-chain');
+    // Lock all buttons
+    const allBtns = container.querySelectorAll('.tc-move-btn, #btn-submit-chain, #btn-shuffle-chain');
     allBtns.forEach((b) => { b.disabled = true; });
 
-    // Submit question answer to Firebase (100 base + 0-20 speed bonus)
+    // Compare each position with data.steps
+    // data.steps[i] represents what should be at position i (step: i + 1)
+    let matchedCount = 0;
+    const matchResults = currentSteps.map((item, idx) => {
+      const correctItemAtThisPos = data.steps[idx];
+      const isMatch = item.id === correctItemAtThisPos.id;
+      if (isMatch) matchedCount++;
+      return {
+        userItem: item,
+        correctItem: correctItemAtThisPos,
+        isMatch,
+        correctStep: item.step // where this userItem actually belongs
+      };
+    });
+
+    const isAllCorrect = matchedCount === data.steps.length;
+
+    // Calculate score: 20 points per correctly placed step (Max 100 base)
+    const basePoints = matchedCount * 20;
+    let speedBonus = 0;
+    if (matchedCount >= 3 && remaining > 0) {
+      speedBonus = Math.round((remaining / STAGE_DURATION_SECONDS) * 20 * (matchedCount / 5));
+    }
+    const totalPoints = basePoints + speedBonus;
+
+    // Submit question answer to Firebase
     try {
       const res = await firebaseService.submitQuestionAnswer(sessionCode, teamNumber, 'game1', data.id, {
-        isCorrect,
+        isCorrect: isAllCorrect,
         remainingSeconds: remaining,
         totalSeconds: STAGE_DURATION_SECONDS,
-        answerData: { userOrder, isTimeout }
+        answerData: {
+          userOrder: currentSteps.map((s) => s.id),
+          matchedCount,
+          totalPoints,
+          isTimeout
+        }
       });
 
-      if (isCorrect) {
+      if (isAllCorrect) {
         audio.playSuccess();
         correctStagesCount++;
-        toast.success(`🎉 TEPAT! ${res.scoreResult.breakdownText}`);
+        toast.success(`🎉 SEMPURNA! Seluruh 5 rantai kalor tepat urutannya! (+${totalPoints} Poin)`);
+      } else if (matchedCount >= 3) {
+        audio.playSuccess();
+        toast.success(`👍 BAGUS! ${matchedCount} dari 5 urutan rantai kalor tepat (+${totalPoints} Poin).`);
       } else {
         audio.playFailure();
-        toast.error('❌ Urutan rantai kalor belum tepat. Simak pembahasan sains berikut!');
+        toast.info(`Urutan belum optimal (${matchedCount} dari 5 tepat). Simak pembahasan sains berikut! (+${totalPoints} Poin)`);
       }
 
-      showScientificExplanationModal(data, isCorrect, res.scoreResult);
+      showScientificExplanationModal(data, matchedCount, totalPoints, speedBonus, matchResults);
     } catch (err) {
-      toast.error('Terjadi kendala saat mengirim skor: ' + err.message);
-      showScientificExplanationModal(data, isCorrect, { totalPoints: isCorrect ? 100 : 0 });
+      toast.error('Kendala mengirim skor: ' + err.message);
+      showScientificExplanationModal(data, matchedCount, totalPoints, speedBonus, matchResults);
     }
   }
 
-  function showScientificExplanationModal(data, isCorrect, scoreResult) {
-    const pointsBadge = isCorrect
+  function showScientificExplanationModal(data, matchedCount, totalPoints, speedBonus, matchResults) {
+    const pointsBadge = totalPoints > 0
       ? `<div style="background:rgba(34,197,94,0.15); border:1.5px solid #22c55e; color:#4ade80; padding:0.6rem 1rem; border-radius:10px; font-weight:800; font-family:var(--font-mono); margin-bottom:1rem; font-size:1.1rem; text-align:center;">
-           🏆 +${scoreResult?.totalPoints || 100} POIN (100 Jawaban Benar ${scoreResult?.speedBonus ? `+ ${scoreResult.speedBonus} Bonus Kecepatan` : ''})
+           🏆 +${totalPoints} POIN DIPEROLEH (${matchedCount}/5 Posisi Tepat ${speedBonus > 0 ? `+ ${speedBonus} Bonus Cepat` : ''})
          </div>`
       : `<div style="background:rgba(239,68,68,0.15); border:1.5px solid #ef4444; color:#f87171; padding:0.6rem 1rem; border-radius:10px; font-weight:800; font-family:var(--font-mono); margin-bottom:1rem; font-size:1.1rem; text-align:center;">
-           ❌ +0 POIN (Urutan Belum Tepat)
+           ❌ +0 POIN (Seluruh Urutan Belum Tepat)
          </div>`;
 
     const content = `
@@ -478,12 +382,17 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
         ${pointsBadge}
 
         <div style="background:rgba(56,189,248,0.1); border-left:3px solid var(--tc-sky); padding:0.85rem 1rem; border-radius:8px; margin-bottom:1.25rem;">
-          <h4 style="color:var(--tc-sky); margin-bottom:0.35rem; font-size:0.92rem; font-weight:800;">
+          <h4 style="color:var(--tc-sky); margin-bottom:0.5rem; font-size:0.92rem; font-weight:800;">
             URUTAN KRONOLOGIS ILMIAH YANG BENAR:
           </h4>
-          <ol style="padding-left:1.2rem; margin:0; color:#e2e8f0; font-size:0.9rem;">
-            ${data.correctOrder.map((step) => `<li style="margin-bottom:0.35rem;">${step}</li>`).join('')}
-          </ol>
+          <div style="display:flex; flex-direction:column; gap:0.45rem;">
+            ${data.steps.map((s, idx) => `
+              <div style="background:rgba(15,23,42,0.6); padding:0.45rem 0.75rem; border-radius:6px; font-size:0.88rem; display:flex; align-items:center; gap:0.5rem;">
+                <span style="font-weight:800; color:var(--tc-yellow); font-family:var(--font-mono); min-width:26px;">#${idx + 1}</span>
+                <span>${s.icon} <strong>${s.title}</strong> — ${s.desc}</span>
+              </div>
+            `).join('')}
+          </div>
         </div>
 
         <div style="background:rgba(30,41,59,0.8); border:1px solid rgba(255,255,255,0.08); padding:0.85rem 1rem; border-radius:8px; margin-bottom:1rem;">
@@ -503,9 +412,9 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     `;
 
     showLabModal({
-      title: `Pembahasan Ilmiah: ${data.title}`,
+      title: `Hasil Evaluasi Sains: ${data.title}`,
       contentHtml: content,
-      confirmText: currentStageIndex < NUMBER_CHAINS_DATA.length - 1 ? 'Lanjut ke Tahap Berikutnya ➔' : 'Tuntaskan Game 1 🏆',
+      confirmText: currentStageIndex < NUMBER_CHAINS_DATA.length - 1 ? 'Lanjut ke Tantangan Berikutnya ➔' : 'Tuntaskan Game 1 🏆',
       onConfirm: () => {
         isChecking = false;
         currentStageIndex++;
@@ -534,7 +443,7 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
             <div class="tc-badge-lab">GAME 1 SELESAI</div>
             <h2 style="font-size:1.85rem; margin:0.5rem 0;">Number Chains Berhasil Dituntaskan!</h2>
             <p style="color:#94a3b8; margin-bottom:1rem; font-size:0.95rem;">
-              Kelompok ${teamNumber} berhasil menyelesaikan ${correctStagesCount} dari ${NUMBER_CHAINS_DATA.length} rantai proses kalor.
+              Kelompok ${teamNumber} berhasil menyelesaikan 5 rantai proses kalor.
             </p>
             <div style="font-size:2.5rem; font-weight:800; color:var(--tc-orange); margin-bottom:0.5rem; font-family:var(--font-mono);">
               +${res.score} POIN
