@@ -58,7 +58,7 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
         <!-- Top Game HUD -->
         <div class="tc-game-hud">
           <div class="tc-hud-badge">
-            <span class="tc-badge-lab">GAME 2 • START CHAMP</span>
+            <span class="tc-badge-lab">BABAK 1 • START CHAMP</span>
             <h2 class="tc-hud-title">COCOKKAN KONSEP KALOR (RONDE ${currentRound + 1}/${TOTAL_ROUNDS})</h2>
           </div>
 
@@ -74,7 +74,7 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
                 🔄 Ke Dashboard
               </button>
             </div>
-            <span class="tc-hud-score-tag">TARGET: 35 PTS</span>
+            <span class="tc-hud-score-tag">TARGET: 50 PTS</span>
           </div>
         </div>
 
@@ -280,7 +280,7 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
     const remaining = timerInstance ? timerInstance.getRemainingSeconds() : 0;
     if (timerInstance) timerInstance.stop();
 
-    toast.info('Menyimpan skor Game 2 ke database...');
+    toast.info('Menyimpan skor Babak 1: Start Champ ke database...');
     try {
       const speedBonus = remaining > 15 ? 5 : Math.round((remaining / 180) * 5 * 10) / 10;
       const res = await firebaseService.submitGame2Score(sessionCode, teamNumber, totalCorrectMatches, START_CHAMP_DATA.length, speedBonus);
@@ -296,7 +296,7 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
               </button>
             </div>
             <div style="font-size:3.5rem; margin-bottom:0.75rem;">⚡</div>
-            <div class="tc-badge-lab">GAME 2 SELESAI</div>
+            <div class="tc-badge-lab">BABAK 1 SELESAI</div>
             <h2 style="font-size:1.85rem; margin:0.5rem 0;">Start Champ Berhasil Dituntaskan!</h2>
             <p style="color:#94a3b8; margin-bottom:1rem; font-size:0.95rem;">
               Kelompok ${teamNumber} berhasil mencocokkan ${totalCorrectMatches} dari ${START_CHAMP_DATA.length} peristiwa konsep kalor.
@@ -308,7 +308,7 @@ export function renderGame2View(container, { sessionCode, teamNumber, onGameComp
             <!-- Auto-progression action buttons -->
             <div style="margin-top:1.25rem; display:flex; flex-direction:column; gap:0.85rem; align-items:center;">
               <button type="button" class="tc-btn tc-btn-primary tc-btn-large" id="btn-next-to-game3" style="width:100%; max-width:380px; font-size:1.05rem; padding:1.1rem 1.5rem; box-shadow:0 0 25px rgba(249, 115, 22, 0.45);">
-                <span>LANJUT KE GAME 3: CRYPTARITHM WAR</span>
+                <span>LANJUT KE BABAK 2: CRYPTARITHM WAR</span>
                 <span class="tc-btn-arrow">➔</span>
               </button>
               <div style="font-size:0.9rem; color:#94a3b8;" id="countdown-game3-text">

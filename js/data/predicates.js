@@ -62,7 +62,6 @@ export function getPredicate(score) {
 }
 
 export const GAME_MAX_SCORES = {
-  game1: 30, // Shuffle and Recall
-  game2: 35, // Word Scramble
-  game3: 35  // Extreme Addition: Heat Calculation
+  game2: 50, // Babak 1: Start Champ (Matching Concept)
+  game3: 50  // Babak 2: Cryptarithm War (Formula Puzzles)
 };

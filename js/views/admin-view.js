@@ -106,17 +106,13 @@ export function renderAdminView(container, { onExit }) {
               <span class="tc-phase-num">0</span>
               <span>Lobi Persiapan</span>
             </button>
-            <button class="tc-btn tc-btn-phase" data-phase="GAME1" id="phase-btn-g1">
-              <span class="tc-phase-num">1</span>
-              <span>Game 1: Number Chains</span>
-            </button>
             <button class="tc-btn tc-btn-phase" data-phase="GAME2" id="phase-btn-g2">
-              <span class="tc-phase-num">2</span>
-              <span>Game 2: Start Champ</span>
+              <span class="tc-phase-num">1</span>
+              <span>Babak 1: Start Champ</span>
             </button>
             <button class="tc-btn tc-btn-phase" data-phase="GAME3" id="phase-btn-g3">
-              <span class="tc-phase-num">3</span>
-              <span>Game 3: Cryptarithm War</span>
+              <span class="tc-phase-num">2</span>
+              <span>Babak 2: Cryptarithm War</span>
             </button>
             <button class="tc-btn tc-btn-phase gold" data-phase="FINISHED" id="phase-btn-finish">
               <span class="tc-phase-num">🏆</span>
@@ -163,15 +159,11 @@ export function renderAdminView(container, { onExit }) {
 
                 <div class="tc-atc-scores">
                   <div class="tc-score-col">
-                    <span class="tc-sc-lbl">G1 (30)</span>
-                    <strong class="tc-sc-val" id="atc-g1-${n}">0</strong>
-                  </div>
-                  <div class="tc-score-col">
-                    <span class="tc-sc-lbl">G2 (35)</span>
+                    <span class="tc-sc-lbl">B1: START (50)</span>
                     <strong class="tc-sc-val" id="atc-g2-${n}">0</strong>
                   </div>
                   <div class="tc-score-col">
-                    <span class="tc-sc-lbl">G3 (35)</span>
+                    <span class="tc-sc-lbl">B2: CRYPTO (50)</span>
                     <strong class="tc-sc-val" id="atc-g3-${n}">0</strong>
                   </div>
                   <div class="tc-score-col total">
@@ -309,9 +301,9 @@ export function renderAdminView(container, { onExit }) {
       try {
         btnMasterStart.disabled = true;
         btnMasterStart.innerHTML = '<span>Memulai Seluruh Kelas...</span>';
-        await firebaseService.setSessionPhase(activeSessionCode, 'GAME1');
+        await firebaseService.setSessionPhase(activeSessionCode, 'GAME2');
         audio.playPhaseTransition();
-        toast.success('🚀 PERMAINAN DIMULAI! Seluruh HP siswa serentak masuk ke Game 1.');
+        toast.success('🚀 PERMAINAN DIMULAI! Seluruh HP siswa serentak masuk ke Babak 1: Start Champ.');
       } catch (err) {
         toast.error('Gagal memulai permainan: ' + err.message);
       } finally {
@@ -430,7 +422,6 @@ export function renderAdminView(container, { onExit }) {
       const badgeEl = card.querySelector(`#atc-badge-${i}`);
       const nameEl = card.querySelector(`#atc-name-${i}`);
       const memEl = card.querySelector(`#atc-members-${i}`);
-      const g1El = card.querySelector(`#atc-g1-${i}`);
       const g2El = card.querySelector(`#atc-g2-${i}`);
       const g3El = card.querySelector(`#atc-g3-${i}`);
       const totEl = card.querySelector(`#atc-total-${i}`);
@@ -461,36 +452,30 @@ export function renderAdminView(container, { onExit }) {
         const mList = (team.members || []).map((m) => `${m.name} (${m.absen})`).join(', ');
         memEl.textContent = mList || 'Belum ada anggota';
 
-        const g1 = team.scores?.game1 || 0;
         const g2 = team.scores?.game2 || 0;
         const g3 = team.scores?.game3 || 0;
         const tot = team.scores?.total || 0;
 
-        g1El.textContent = g1;
-        g2El.textContent = g2;
-        g3El.textContent = g3;
-        totEl.textContent = tot;
-        predEl.textContent = team.predicate || 'Temperature Rookie';
+        if (g2El) g2El.textContent = g2;
+        if (g3El) g3El.textContent = g3;
+        if (totEl) totEl.textContent = tot;
+        if (predEl) predEl.textContent = team.predicate || 'Temperature Rookie';
 
         // Update real-time stage progress tag
         const stageEl = card.querySelector(`#atc-stage-${i}`);
         if (stageEl) {
-          if ((g1 > 0 && g2 > 0 && g3 > 0) || tot >= 100) {
+          if ((g2 > 0 && g3 > 0) || tot >= 100) {
             stageEl.style.background = 'rgba(234, 179, 8, 0.2)';
             stageEl.style.color = '#fde047';
             stageEl.textContent = '🏁 Tuntas';
           } else if (g2 > 0) {
             stageEl.style.background = 'rgba(168, 85, 247, 0.2)';
             stageEl.style.color = '#c084fc';
-            stageEl.textContent = '🧩 Game 3';
-          } else if (g1 > 0) {
+            stageEl.textContent = '🧩 Babak 2';
+          } else if (session.currentPhase && session.currentPhase !== 'LOBBY') {
             stageEl.style.background = 'rgba(56, 189, 248, 0.2)';
             stageEl.style.color = '#38bdf8';
-            stageEl.textContent = '⚡ Game 2';
-          } else if (session.currentPhase && session.currentPhase !== 'LOBBY') {
-            stageEl.style.background = 'rgba(249, 115, 22, 0.2)';
-            stageEl.style.color = '#fb923c';
-            stageEl.textContent = '⛓️ Game 1';
+            stageEl.textContent = '⚡ Babak 1';
           } else {
             stageEl.style.background = 'rgba(255,255,255,0.06)';
             stageEl.style.color = '#94a3b8';
@@ -504,11 +489,10 @@ export function renderAdminView(container, { onExit }) {
         if (resetBtn) resetBtn.classList.add('hidden');
         nameEl.textContent = '-';
         memEl.textContent = '-';
-        g1El.textContent = '0';
-        g2El.textContent = '0';
-        g3El.textContent = '0';
-        totEl.textContent = '0';
-        predEl.textContent = 'Temperature Rookie';
+        if (g2El) g2El.textContent = '0';
+        if (g3El) g3El.textContent = '0';
+        if (totEl) totEl.textContent = '0';
+        if (predEl) predEl.textContent = 'Temperature Rookie';
 
         const stageEl = card.querySelector(`#atc-stage-${i}`);
         if (stageEl) {

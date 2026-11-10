@@ -519,7 +519,7 @@ class FirebaseService {
   }
 
   /**
-   * SUBMIT GAME 2 (START CHAMP MATCHING - MAX 35 PTS)
+   * SUBMIT GAME 2 (START CHAMP MATCHING - MAX 50 PTS)
    */
   async submitGame2Score(sessionCode, teamNumber, correctCount, totalItems = 12, speedBonus = 0) {
     const session = await this.getSession(sessionCode);
@@ -528,11 +528,13 @@ class FirebaseService {
     }
 
     const team = session.teams[`team_${teamNumber}`];
-    let score = (correctCount * 2.5) + (Number(speedBonus) || 0);
-    score = Math.min(35, Math.round(score * 10) / 10);
+    let baseScore = (correctCount / totalItems) * 48;
+    let score = baseScore + (Number(speedBonus) || 0);
+    if (correctCount === totalItems) score = 50;
+    score = Math.min(50, Math.round(score * 10) / 10);
 
     team.scores.game2 = score;
-    team.scores.total = Math.min(100, Math.round(((team.scores.game1 || 0) + score + (team.scores.game3 || 0)) * 10) / 10);
+    team.scores.total = Math.min(100, Math.round(((team.scores.game2 || 0) + (team.scores.game3 || 0)) * 10) / 10);
     team.predicate = getPredicate(team.scores.total).title;
     if (!team.progress) team.progress = {};
     team.progress.game2Submitted = true;
@@ -563,7 +565,7 @@ class FirebaseService {
   }
 
   /**
-   * SUBMIT GAME 3 (CRYPTARITHM WAR - MAX 35 PTS)
+   * SUBMIT GAME 3 (CRYPTARITHM WAR - MAX 50 PTS)
    */
   async submitGame3Score(sessionCode, teamNumber, correctCount, totalItems = 6, speedBonus = 0) {
     const session = await this.getSession(sessionCode);
@@ -572,11 +574,13 @@ class FirebaseService {
     }
 
     const team = session.teams[`team_${teamNumber}`];
-    let score = (correctCount * 5.0) + (Number(speedBonus) || 0);
-    score = Math.min(35, Math.round(score * 10) / 10);
+    let baseScore = (correctCount / totalItems) * 48;
+    let score = baseScore + (Number(speedBonus) || 0);
+    if (correctCount === totalItems) score = 50;
+    score = Math.min(50, Math.round(score * 10) / 10);
 
     team.scores.game3 = score;
-    team.scores.total = Math.min(100, Math.round(((team.scores.game1 || 0) + (team.scores.game2 || 0) + score) * 10) / 10);
+    team.scores.total = Math.min(100, Math.round(((team.scores.game2 || 0) + (team.scores.game3 || 0)) * 10) / 10);
     team.predicate = getPredicate(team.scores.total).title;
     if (!team.progress) team.progress = {};
     team.progress.game3Submitted = true;
@@ -669,14 +673,14 @@ class FirebaseService {
     ];
 
     const sampleScores = [
-      { g1: 30, g2: 34.5, g3: 35 },     // 99.5 - Champion
-      { g1: 27.5, g2: 32, g3: 32.5 },   // 92.0 - Champion
-      { g1: 25, g2: 30, g3: 30 },       // 85.0 - Expert
-      { g1: 25, g2: 27.5, g3: 28 },     // 80.5 - Expert
-      { g1: 22.5, g2: 25, g3: 25 },     // 72.5 - Challenger
-      { g1: 20, g2: 24, g3: 22 },       // 66.0 - Challenger
-      { g1: 17.5, g2: 22.5, g3: 20 },   // 60.0 - Explorer
-      { g1: 15, g2: 18, g3: 15 }        // 48.0 - Rookie
+      { g2: 49.5, g3: 50 },     // 99.5 - Champion
+      { g2: 46.0, g3: 46.0 },   // 92.0 - Champion
+      { g2: 42.5, g3: 42.5 },   // 85.0 - Expert
+      { g2: 40.0, g3: 40.5 },   // 80.5 - Expert
+      { g2: 36.5, g3: 36.0 },   // 72.5 - Challenger
+      { g2: 33.0, g3: 33.0 },   // 66.0 - Challenger
+      { g2: 30.0, g3: 30.0 },   // 60.0 - Explorer
+      { g2: 24.0, g3: 24.0 }    // 48.0 - Rookie
     ];
 
     if (!session.teams) session.teams = {};
@@ -684,7 +688,7 @@ class FirebaseService {
     for (let i = 1; i <= 8; i++) {
       const idx = i - 1;
       const sc = sampleScores[idx];
-      const total = Math.min(100, Math.round((sc.g1 + sc.g2 + sc.g3) * 10) / 10);
+      const total = Math.min(100, Math.round((sc.g2 + sc.g3) * 10) / 10);
 
       session.teams[`team_${i}`] = {
         number: i,
@@ -694,7 +698,7 @@ class FirebaseService {
         ready: true,
         joinedAt: this.getServerTime() - (idx * 5000),
         scores: {
-          game1: sc.g1,
+          game1: 0,
           game2: sc.g2,
           game3: sc.g3,
           total

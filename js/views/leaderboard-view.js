@@ -55,9 +55,8 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
                 <th>RANK</th>
                 <th>KELOMPOK</th>
                 <th>ANGGOTA</th>
-                <th>G1 (30)</th>
-                <th>G2 (35)</th>
-                <th>G3 (35)</th>
+                <th>B1: START CHAMP (50)</th>
+                <th>B2: CRYPTARITHM (50)</th>
                 <th>TOTAL (100)</th>
                 <th>PREDIKAT</th>
               </tr>
@@ -237,7 +236,6 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
             <small>Kelompok ${t.number}</small>
           </td>
           <td class="tc-col-members">${membersStr || '-'}</td>
-          <td class="tc-col-num">${t.scores?.game1 || 0}</td>
           <td class="tc-col-num">${t.scores?.game2 || 0}</td>
           <td class="tc-col-num">${t.scores?.game3 || 0}</td>
           <td class="tc-col-total">

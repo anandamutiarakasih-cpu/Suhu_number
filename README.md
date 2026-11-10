@@ -16,13 +16,12 @@ Aplikasi ini menggunakan konsep kompetisi antarkelompok (hingga **8 kelompok**) 
 
 ---
 
-## 2. Struktur 3 Game & Sistem Penilaian (Total 100 Poin)
+## 2. Struktur 2 Babak Game & Sistem Penilaian (Total 100 Poin)
 
 | No | Babak Permainan | Konsep & Mekanisme | Skor Maksimal |
 |:---:|---|---|:---:|
-| **1** | **NUMBER CHAINS**<br>*(Rantai Peristiwa Kalor)* | Menyusun kartu proses dan perubahan kalor secara runtut dan kronologis. Terdapat 5 tahap tantangan ilmiah (peleburan es, angin laut, termos air, pengembunan, dan bimetal) dilengkapi fitur geser/naik-turun kartu dan ulasan sains instan. | **30 Pts** |
-| **2** | **START CHAMP**<br>*(Mencocokkan Konsep)* | Mengidentifikasi dan mencocokkan 12 ilustrasi peristiwa kalor sehari-hari dengan konsep perpindahan kalor (konduksi, konveksi, radiasi) dan perubahan wujud zat. Dibagi dalam 3 ronde dinamis. | **35 Pts** |
-| **3** | **CRYPTARITHM WAR**<br>*(Teka-Teki Angka Kalor)* | Memecahkan 6 teka-teki rumus kuantitatif kalor ($Q = m \cdot c \cdot \Delta T$, $Q = m \cdot L$, Asas Black) dengan keypad angka layar sentuh dan whiteboard digital (*Kertas Cakar*) in-app. | **35 Pts** |
+| **1** | **BABAK 1: START CHAMP**<br>*(Mencocokkan Konsep)* | Mengidentifikasi dan mencocokkan 12 ilustrasi peristiwa kalor sehari-hari dengan konsep perpindahan kalor (konduksi, konveksi, radiasi) dan perubahan wujud zat. Dibagi dalam 3 ronde dinamis. | **50 Pts** |
+| **2** | **BABAK 2: CRYPTARITHM WAR**<br>*(Teka-Teki Angka Kalor)* | Memecahkan 6 teka-teki rumus kuantitatif kalor ($Q = m \cdot c \cdot \Delta T$, $Q = m \cdot L$, Asas Black) dengan keypad angka layar sentuh dan whiteboard digital (*Kertas Cakar*) in-app. | **50 Pts** |
 | | **TOTAL KESELURUHAN** | | **100 Pts** |
 
 ### Tingkat Predikat Kelulusan Kalor:
@@ -48,9 +47,8 @@ Aplikasi menggunakan arsitektur **Single Page Application (SPA)** dengan sinkron
 4. Klik **"🔗 Salin Link HP"** atau **"📋 Salin Kode"** lalu bagikan ke siswa.
 5. Kendalikan jalannya kompetisi secara terpusat lewat **Bilah Kendali Fase**:
    - `[0] Lobi Persiapan`: Siswa masuk dan mendaftarkan kelompok.
-   - `[1] Game 1: Number Chains`: Semua HP siswa serentak masuk ke Game 1!
-   - `[2] Game 2: Start Champ`: Semua HP siswa serentak masuk ke Game 2!
-   - `[3] Game 3: Cryptarithm War`: Semua HP siswa serentak masuk ke Game 3!
+   - `[1] Babak 1: Start Champ`: Semua HP siswa serentak masuk ke Start Champ (Maks 50 Pts)!
+   - `[2] Babak 2: Cryptarithm War`: Semua HP siswa serentak masuk ke Cryptarithm War (Maks 50 Pts)!
    - `[🏆] Buka Leaderboard`: Semua HP siswa serentak menampilkan podium juara dan rekap nilai akhir.
 6. Pantau perolehan skor 8 kelompok secara live pada **Live Scoreboard**.
 7. Klik **"📥 Unduh Rekap Hasil (CSV)"** untuk mengekspor nilai ke Excel.

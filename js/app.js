@@ -13,7 +13,6 @@ import { renderHomeView } from './views/home-view.js';
 import { renderRegisterView } from './views/register-view.js';
 import { renderWaitingView } from './views/waiting-view.js';
 import { renderAdminView } from './views/admin-view.js';
-import { renderGame1View } from './views/game1-view.js';
 import { renderGame2View } from './views/game2-view.js';
 import { renderGame3View } from './views/game3-view.js';
 import { renderLeaderboardView } from './views/leaderboard-view.js';
@@ -240,9 +239,9 @@ class ChampionsOfCalorApp {
     audio.playPhaseTransition();
     const phaseNames = {
       'LOBBY': 'Lobi Persiapan',
-      'GAME1': 'Game 1: Number Chains',
-      'GAME2': 'Game 2: Start Champ',
-      'GAME3': 'Game 3: Cryptarithm War',
+      'GAME1': 'Babak 1: Start Champ',
+      'GAME2': 'Babak 1: Start Champ',
+      'GAME3': 'Babak 2: Cryptarithm War',
       'FINISHED': 'Klasemen Akhir (Leaderboard)'
     };
     const title = phaseNames[phase] || phase;
@@ -253,8 +252,6 @@ class ChampionsOfCalorApp {
         this.navigate('waiting');
         break;
       case 'GAME1':
-        this.navigate('game1');
-        break;
       case 'GAME2':
         this.navigate('game2');
         break;
@@ -321,7 +318,7 @@ class ChampionsOfCalorApp {
         break;
 
       case 'waiting':
-        preloadStyle('css/game1.css?v=2.5');
+        preloadStyle('css/game2.css?v=2.7');
         this.currentViewInstance = renderWaitingView(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -349,27 +346,13 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game1':
-        loadStyle('css/game1.css?v=2.5');
-        preloadStyle('css/game2.css?v=2.5');
-        this.currentViewInstance = renderGame1View(this.appContainer, {
-          sessionCode: this.state.sessionCode,
-          teamNumber: this.state.teamNumber,
-          onResetToHome: () => this.resetToHome(),
-          onNextGame: () => {
-            this.navigate('game2');
-          },
-          onGameCompleted: () => {
-            // Completed Game 1
-          },
-          onPhaseChange: (newPhase) => {
-            this.routeByPhase(newPhase);
-          }
-        });
+        // Babak 1 sekarang langsung ke Start Champ (Game 2)
+        this.navigate('game2');
         break;
 
       case 'game2':
-        loadStyle('css/game2.css?v=2.4');
-        preloadStyle('css/game3.css?v=2.4');
+        loadStyle('css/game2.css?v=2.7');
+        preloadStyle('css/game3.css?v=2.7');
         this.currentViewInstance = renderGame2View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -387,8 +370,8 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game3':
-        loadStyle('css/game3.css?v=2.4');
-        preloadStyle('css/leaderboard.css?v=2.4');
+        loadStyle('css/game3.css?v=2.7');
+        preloadStyle('css/leaderboard.css?v=2.7');
         this.currentViewInstance = renderGame3View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -406,7 +389,7 @@ class ChampionsOfCalorApp {
         break;
 
       case 'leaderboard':
-        loadStyle('css/leaderboard.css?v=2.4');
+        loadStyle('css/leaderboard.css?v=2.7');
         this.currentViewInstance = renderLeaderboardView(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,

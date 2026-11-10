@@ -60,7 +60,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
         <!-- Top Game HUD -->
         <div class="tc-game-hud">
           <div class="tc-hud-badge">
-            <span class="tc-badge-lab">GAME 3 • CRYPTARITHM WAR</span>
+            <span class="tc-badge-lab">BABAK 2 • CRYPTARITHM WAR</span>
             <h2 class="tc-hud-title">TEKA-TEKI ANGKA KALOR (${currentIndex + 1}/6)</h2>
           </div>
 
@@ -76,7 +76,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
                 🔄 Ke Dashboard
               </button>
             </div>
-            <span class="tc-hud-score-tag">TARGET: 35 PTS</span>
+            <span class="tc-hud-score-tag">TARGET: 50 PTS</span>
           </div>
         </div>
 
@@ -376,7 +376,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     showLabModal({
       title: `Solusi Perhitungan: ${data.title}`,
       contentHtml: content,
-      confirmText: currentIndex < CRYPTARITHM_DATA.length - 1 ? 'Soal Berikutnya ➔' : 'Tuntaskan Game 3 🏆',
+      confirmText: currentIndex < CRYPTARITHM_DATA.length - 1 ? 'Soal Berikutnya ➔' : 'Tuntaskan Babak 2 🏆',
       onConfirm: () => {
         isChecking = false;
         currentIndex++;
@@ -389,7 +389,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     const remaining = timerInstance ? timerInstance.getRemainingSeconds() : 0;
     if (timerInstance) timerInstance.stop();
 
-    toast.info('Menyimpan skor Game 3 ke database...');
+    toast.info('Menyimpan skor Babak 2: Cryptarithm War ke database...');
     try {
       const speedBonus = remaining > 20 ? 5 : Math.round((remaining / 240) * 5 * 10) / 10;
       const res = await firebaseService.submitGame3Score(sessionCode, teamNumber, correctCount, CRYPTARITHM_DATA.length, speedBonus);
