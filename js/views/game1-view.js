@@ -15,7 +15,7 @@ import { loadStyle } from '../utils/asset-loader.js';
 import { showInGameLeaderboardModal } from '../components/in-game-leaderboard-modal.js';
 
 export function renderGame1View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
-  loadStyle('css/game1.css?v=2.8');
+  loadStyle('css/game1.css?v=3.0');
 
   let currentStageIndex = 0;
   let currentSteps = []; // array of 5 step objects in current user order
@@ -117,7 +117,7 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
 
         <!-- How To Instruction Bar -->
         <div class="tc-chain-instruction-bar">
-          <span>Gunakan tombol <strong>[▲ Naik]</strong> atau <strong>[▼ Turun]</strong> untuk menyusun peristiwa dari <strong>Langkah 1 (Paling Awal)</strong> hingga <strong>Langkah 5 (Paling Akhir)</strong>.</span>
+          <span>💡 <strong>CARA MUDAH:</strong> Tekan tombol besar <strong>[▲] / [▼]</strong> ATAU <strong>ketuk kartu</strong> untuk langsung menukar posisi urutan!</span>
         </div>
 
         <!-- 5 Interactive Reorderable Cards -->
@@ -180,32 +180,36 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     attachReorderInteractions(data);
   }
 
+  let selectedIdxForSwap = null;
+
   function renderCardsHTML() {
     return currentSteps.map((item, idx) => {
       const stepNum = idx + 1;
       const isFirst = idx === 0;
       const isLast = idx === currentSteps.length - 1;
+      const isSelected = selectedIdxForSwap === idx;
 
       return `
-        <div class="tc-reorder-card" data-idx="${idx}" id="step-card-${idx}">
+        <div class="tc-reorder-card ${isSelected ? 'selected' : ''}" data-idx="${idx}" id="step-card-${idx}">
           <div class="tc-reorder-num-badge">
             <span class="tc-badge-step-digit">${stepNum}</span>
             <span class="tc-badge-step-lbl">${isFirst ? 'Awal' : isLast ? 'Akhir' : 'Langkah'}</span>
           </div>
 
-          <div class="tc-reorder-content">
+          <div class="tc-reorder-content" title="Ketuk untuk menukar posisi">
             <div class="tc-reorder-heading">
               <span class="tc-reorder-icon">${item.icon}</span>
               <span>${item.title}</span>
             </div>
             <p class="tc-reorder-desc">${item.desc}</p>
+            <span class="tc-reorder-swap-hint">${isSelected ? '⚡ Terpilih! Ketuk kartu lain untuk menukar.' : '👆 Ketuk kartu ini untuk menukar posisi'}</span>
           </div>
 
           <div class="tc-reorder-ctrls">
-            <button type="button" class="tc-move-btn btn-move-up" data-idx="${idx}" ${isFirst ? 'disabled' : ''} title="Pindahkan ke langkah lebih awal">
+            <button type="button" class="tc-move-btn btn-move-up" data-idx="${idx}" ${isFirst ? 'disabled' : ''} title="Pindahkan langkah ke atas" aria-label="Naik">
               ▲
             </button>
-            <button type="button" class="tc-move-btn btn-move-down" data-idx="${idx}" ${isLast ? 'disabled' : ''} title="Pindahkan ke langkah berikutnya">
+            <button type="button" class="tc-move-btn btn-move-down" data-idx="${idx}" ${isLast ? 'disabled' : ''} title="Pindahkan langkah ke bawah" aria-label="Turun">
               ▼
             </button>
           </div>
@@ -214,37 +218,148 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     }).join('');
   }
 
+  function swapIndices(idxA, idxB) {
+    if (idxA === idxB) return;
+    if (idxA < 0 || idxA >= currentSteps.length || idxB < 0 || idxB >= currentSteps.length) return;
+
+    // 1. Swap in internal data array
+    const temp = currentSteps[idxA];
+    currentSteps[idxA] = currentSteps[idxB];
+    currentSteps[idxB] = temp;
+
+    // 2. Direct DOM reordering (without re-rendering innerHTML, preserving touch state & buttons!)
+    const listEl = container.querySelector('#reorder-cards-list');
+    if (listEl) {
+      const cards = Array.from(listEl.querySelectorAll('.tc-reorder-card'));
+      const cardA = cards[idxA];
+      const cardB = cards[idxB];
+
+      if (cardA && cardB) {
+        if (idxB === idxA + 1) {
+          listEl.insertBefore(cardB, cardA);
+        } else if (idxA === idxB + 1) {
+          listEl.insertBefore(cardA, cardB);
+        } else {
+          const nextA = cardA.nextSibling;
+          const nextB = cardB.nextSibling;
+          if (nextA === cardB) {
+            listEl.insertBefore(cardB, cardA);
+          } else if (nextB === cardA) {
+            listEl.insertBefore(cardA, cardB);
+          } else {
+            listEl.insertBefore(cardA, nextB);
+            listEl.insertBefore(cardB, nextA);
+          }
+        }
+      }
+    }
+
+    // 3. Clear selected swap state
+    selectedIdxForSwap = null;
+
+    // 4. Update badges, data-idx, and button disabled states smoothly
+    updateAllCardAttributes();
+  }
+
+  function updateAllCardAttributes() {
+    const listEl = container.querySelector('#reorder-cards-list');
+    if (!listEl) return;
+    const cards = Array.from(listEl.querySelectorAll('.tc-reorder-card'));
+
+    cards.forEach((card, idx) => {
+      card.dataset.idx = String(idx);
+      card.id = `step-card-${idx}`;
+
+      // Update badge numbers and labels
+      const digitEl = card.querySelector('.tc-badge-step-digit');
+      const lblEl = card.querySelector('.tc-badge-step-lbl');
+      if (digitEl) digitEl.textContent = idx + 1;
+      if (lblEl) lblEl.textContent = idx === 0 ? 'Awal' : idx === cards.length - 1 ? 'Akhir' : 'Langkah';
+
+      // Update buttons
+      const upBtn = card.querySelector('.btn-move-up');
+      const downBtn = card.querySelector('.btn-move-down');
+      if (upBtn) {
+        upBtn.dataset.idx = String(idx);
+        upBtn.disabled = idx === 0;
+      }
+      if (downBtn) {
+        downBtn.dataset.idx = String(idx);
+        downBtn.disabled = idx === cards.length - 1;
+      }
+
+      // Update selection styling and hint
+      const isSelected = selectedIdxForSwap === idx;
+      if (isSelected) {
+        card.classList.add('selected');
+      } else {
+        card.classList.remove('selected');
+      }
+
+      const hintEl = card.querySelector('.tc-reorder-swap-hint');
+      if (hintEl) {
+        hintEl.textContent = isSelected
+          ? '⚡ Terpilih! Ketuk kartu lain untuk bertukar tempat.'
+          : (selectedIdxForSwap !== null ? '👉 Ketuk kartu ini untuk menukar ke sini' : '👆 Ketuk kartu ini untuk menukar posisi');
+      }
+    });
+  }
+
   function attachReorderInteractions(data) {
     const listEl = container.querySelector('#reorder-cards-list');
     const submitBtn = container.querySelector('#btn-submit-chain');
     const shuffleBtn = container.querySelector('#btn-shuffle-chain');
 
-    // Up / Down Button Clicks via Event Delegation
+    // Click handler with instant response & zero-lag DOM swapping
     listEl.addEventListener('click', (e) => {
       if (isChecking) return;
 
       const upBtn = e.target.closest('.btn-move-up');
       const downBtn = e.target.closest('.btn-move-down');
+      const card = e.target.closest('.tc-reorder-card');
 
       if (upBtn && !upBtn.disabled) {
+        e.stopPropagation();
         audio.playClick();
         const idx = parseInt(upBtn.dataset.idx, 10);
         if (idx > 0) {
-          // Swap idx with idx - 1
-          const temp = currentSteps[idx];
-          currentSteps[idx] = currentSteps[idx - 1];
-          currentSteps[idx - 1] = temp;
-          refreshCardsUI();
+          selectedIdxForSwap = null;
+          swapIndices(idx, idx - 1);
         }
-      } else if (downBtn && !downBtn.disabled) {
+        return;
+      }
+
+      if (downBtn && !downBtn.disabled) {
+        e.stopPropagation();
         audio.playClick();
         const idx = parseInt(downBtn.dataset.idx, 10);
         if (idx < currentSteps.length - 1) {
-          // Swap idx with idx + 1
-          const temp = currentSteps[idx];
-          currentSteps[idx] = currentSteps[idx + 1];
-          currentSteps[idx + 1] = temp;
-          refreshCardsUI();
+          selectedIdxForSwap = null;
+          swapIndices(idx, idx + 1);
+        }
+        return;
+      }
+
+      // Tap-to-Swap: clicking anywhere on the card body
+      if (card) {
+        const clickedIdx = parseInt(card.dataset.idx, 10);
+        audio.playClick();
+
+        if (selectedIdxForSwap === null) {
+          // Select this card to swap
+          selectedIdxForSwap = clickedIdx;
+          updateAllCardAttributes();
+          toast.info(`Kartu #${clickedIdx + 1} dipilih. Sekarang ketuk kartu tujuan untuk menukar posisi.`);
+        } else if (selectedIdxForSwap === clickedIdx) {
+          // Deselect
+          selectedIdxForSwap = null;
+          updateAllCardAttributes();
+        } else {
+          // Swap selected card with clicked card
+          const fromIdx = selectedIdxForSwap;
+          const toIdx = clickedIdx;
+          swapIndices(fromIdx, toIdx);
+          toast.success(`Berhasil menukar Langkah #${fromIdx + 1} dengan Langkah #${toIdx + 1}!`);
         }
       }
     });
@@ -254,8 +369,12 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
       shuffleBtn.addEventListener('click', () => {
         if (isChecking) return;
         audio.playClick();
+        selectedIdxForSwap = null;
         currentSteps.sort(() => Math.random() - 0.5);
-        refreshCardsUI();
+        if (listEl) {
+          listEl.innerHTML = renderCardsHTML();
+          updateAllCardAttributes();
+        }
         toast.info('Urutan kartu diacak ulang.');
       });
     }
@@ -267,13 +386,6 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
         audio.playClick();
         evaluateSequence(false);
       });
-    }
-  }
-
-  function refreshCardsUI() {
-    const listEl = container.querySelector('#reorder-cards-list');
-    if (listEl) {
-      listEl.innerHTML = renderCardsHTML();
     }
   }
 
