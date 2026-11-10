@@ -11,7 +11,7 @@ import { exportSessionToCSV } from '../services/export-service.js';
 import { networkService } from '../services/network-service.js';
 import { isMobileDevice } from '../utils/device.js';
 
-export function renderAdminView(container, { onExit }) {
+export function renderAdminView(container, { onExit, onOpenLeaderboard } = {}) {
   if (isMobileDevice()) {
     container.innerHTML = `
       <div class="tc-view tc-admin-lock-view" style="max-width:540px; margin:2.5rem auto; text-align:center; padding:1.5rem 1rem;">
@@ -215,7 +215,7 @@ export function renderAdminView(container, { onExit }) {
     try {
       const session = await firebaseService.createSession();
       activeSessionCode = session.code;
-      dispCode.textContent = activeSessionCode;
+      if (dispCode) dispCode.textContent = activeSessionCode;
       localStorage.setItem('tc_active_admin_session', activeSessionCode);
       toast.success(`Kode Sesi ${activeSessionCode} berhasil dibuat & aktif!`);
       attachSessionListener(activeSessionCode);
@@ -228,7 +228,7 @@ export function renderAdminView(container, { onExit }) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
       }
       activeSessionCode = code;
-      dispCode.textContent = activeSessionCode;
+      if (dispCode) dispCode.textContent = activeSessionCode;
       localStorage.setItem('tc_active_admin_session', activeSessionCode);
       toast.success(`Kode Sesi ${activeSessionCode} aktif!`);
       attachSessionListener(activeSessionCode);
@@ -277,15 +277,20 @@ export function renderAdminView(container, { onExit }) {
   phaseButtons.forEach((btn) => {
     btn.addEventListener('click', async () => {
       audio.playClick();
-      if (!activeSessionCode) {
+      const effectiveCode = activeSessionCode || localStorage.getItem('tc_active_admin_session');
+      if (!effectiveCode) {
         toast.warning('Buat sesi terlebih dahulu.');
         return;
       }
-      const targetPhase = btn.dataset.phase;
+      activeSessionCode = effectiveCode;
+      const targetPhase = btn.dataset?.phase || btn.getAttribute?.('data-phase');
       try {
-        await firebaseService.setSessionPhase(activeSessionCode, targetPhase);
+        await firebaseService.setSessionPhase(effectiveCode, targetPhase);
         audio.playPhaseTransition();
         toast.success(`Fase berhasil dialihkan ke: ${targetPhase}`);
+        if (targetPhase === 'FINISHED' && onOpenLeaderboard) {
+          onOpenLeaderboard(effectiveCode);
+        }
       } catch (err) {
         toast.error('Gagal mengubah fase: ' + err.message);
       }
@@ -303,14 +308,16 @@ export function renderAdminView(container, { onExit }) {
   if (btnMasterStart) {
     btnMasterStart.addEventListener('click', async () => {
       audio.playClick();
-      if (!activeSessionCode) {
+      const effectiveCode = activeSessionCode || localStorage.getItem('tc_active_admin_session');
+      if (!effectiveCode) {
         toast.warning('Sedang menyiapkan kode sesi...');
         return;
       }
+      activeSessionCode = effectiveCode;
       try {
         btnMasterStart.disabled = true;
         btnMasterStart.innerHTML = '<span>Memulai Seluruh Kelas...</span>';
-        await firebaseService.setSessionPhase(activeSessionCode, 'GAME1');
+        await firebaseService.setSessionPhase(effectiveCode, 'GAME1');
         audio.playPhaseTransition();
         toast.success('🚀 PERMAINAN DIMULAI! Seluruh HP siswa serentak masuk ke Game 1: Number Chains.');
       } catch (err) {
@@ -324,11 +331,19 @@ export function renderAdminView(container, { onExit }) {
   if (btnMasterLB) {
     btnMasterLB.addEventListener('click', async () => {
       audio.playClick();
-      if (!activeSessionCode) return;
+      const effectiveCode = activeSessionCode || localStorage.getItem('tc_active_admin_session');
+      if (!effectiveCode) {
+        toast.warning('Sedang menyiapkan kode sesi...');
+        return;
+      }
+      activeSessionCode = effectiveCode;
       try {
-        await firebaseService.setSessionPhase(activeSessionCode, 'FINISHED');
+        await firebaseService.setSessionPhase(effectiveCode, 'FINISHED');
         audio.playFanfare();
-        toast.success('🏆 Membuka Klasemen Akhir & Podium Juara untuk semua siswa!');
+        toast.success('🏆 Membuka Klasemen Akhir & Podium Juara!');
+        if (onOpenLeaderboard) {
+          onOpenLeaderboard(effectiveCode);
+        }
       } catch (err) {
         toast.error('Gagal membuka leaderboard: ' + err.message);
       }
@@ -568,9 +583,15 @@ export function renderAdminView(container, { onExit }) {
     });
   }
 
-  // Selalu buat sesi baru bersih di awal sesuai permintaan: reset ulang di awal
-  localStorage.removeItem('tc_active_admin_session');
-  createSessionNow();
+  // Resume active admin session or create new one if none exists
+  const existingAdminCode = localStorage.getItem('tc_active_admin_session');
+  if (existingAdminCode) {
+    activeSessionCode = existingAdminCode;
+    if (dispCode) dispCode.textContent = activeSessionCode;
+    attachSessionListener(activeSessionCode);
+  } else {
+    createSessionNow();
+  }
 
   return {
     destroy: () => {

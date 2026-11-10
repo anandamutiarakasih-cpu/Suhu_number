@@ -963,23 +963,74 @@ class FirebaseService {
 
     const compileLeaderboard = (session) => {
       if (!session) return [];
-      let list = [];
-      if (session.leaderboard && Object.keys(session.leaderboard).length > 0) {
-        list = Object.values(session.leaderboard).filter(Boolean);
-      } else if (session.teams) {
-        list = Object.values(session.teams).filter((t) => t && (t.claimed || t.scores?.total > 0)).map((t) => ({
-          groupId: `team_${t.number}`,
-          groupName: t.name || `Kelompok ${t.number}`,
-          teamNumber: t.number,
-          numberChainsScore: t.scores?.game1 || 0,
-          startChampScore: t.scores?.game2 || 0,
-          cryptarithmWarScore: t.scores?.game3 || 0,
-          totalScore: t.scores?.total || 0,
-          correctAnswers: t.correctAnswers?.total || 0,
-          completionTime: t.completionTime || 0,
-          status: t.status || (t.progress?.game3Submitted ? 'FINISHED' : 'PLAYING'),
-          updatedAt: t.lastActive || 0
-        }));
+      const teamMap = new Map();
+
+      // 1. Ingest session.teams
+      if (session.teams && typeof session.teams === 'object') {
+        Object.values(session.teams).forEach((t) => {
+          if (!t) return;
+          const num = parseInt(t.number || t.teamNumber, 10);
+          if (isNaN(num)) return;
+          const totalScore = Number(t.scores?.total ?? t.totalScore ?? 0);
+          const corr = typeof t.correctAnswers === 'object' ? (t.correctAnswers?.total || 0) : Number(t.correctAnswers || 0);
+          const time = Number(t.completionTime || 0);
+          teamMap.set(num, {
+            groupId: `team_${num}`,
+            groupName: (t.name || `Kelompok ${num}`).trim(),
+            teamNumber: num,
+            numberChainsScore: Number(t.scores?.game1 ?? t.numberChainsScore ?? 0),
+            startChampScore: Number(t.scores?.game2 ?? t.startChampScore ?? 0),
+            cryptarithmWarScore: Number(t.scores?.game3 ?? t.cryptarithmWarScore ?? 0),
+            totalScore,
+            correctAnswers: corr,
+            completionTime: time,
+            status: t.status || (t.progress?.game3Submitted ? 'FINISHED' : 'PLAYING'),
+            claimed: Boolean(t.claimed),
+            updatedAt: t.lastActive || t.joinedAt || 0
+          });
+        });
+      }
+
+      // 2. Overlay / Merge session.leaderboard
+      if (session.leaderboard && typeof session.leaderboard === 'object') {
+        Object.values(session.leaderboard).forEach((lb) => {
+          if (!lb) return;
+          const num = parseInt(lb.teamNumber, 10);
+          if (isNaN(num)) return;
+          const existing = teamMap.get(num) || {
+            groupId: `team_${num}`,
+            groupName: `Kelompok ${num}`,
+            teamNumber: num,
+            numberChainsScore: 0,
+            startChampScore: 0,
+            cryptarithmWarScore: 0,
+            totalScore: 0,
+            correctAnswers: 0,
+            completionTime: 0,
+            status: 'PLAYING',
+            claimed: true,
+            updatedAt: 0
+          };
+
+          existing.groupName = lb.groupName || existing.groupName;
+          existing.numberChainsScore = Math.max(existing.numberChainsScore, Number(lb.numberChainsScore || 0));
+          existing.startChampScore = Math.max(existing.startChampScore, Number(lb.startChampScore || 0));
+          existing.cryptarithmWarScore = Math.max(existing.cryptarithmWarScore, Number(lb.cryptarithmWarScore || 0));
+          existing.totalScore = Math.max(existing.totalScore, Number(lb.totalScore || 0));
+          existing.correctAnswers = Math.max(existing.correctAnswers, Number(lb.correctAnswers || 0));
+          if (lb.completionTime) existing.completionTime = Number(lb.completionTime);
+          if (lb.status) existing.status = lb.status;
+          if (lb.updatedAt) existing.updatedAt = Number(lb.updatedAt);
+          teamMap.set(num, existing);
+        });
+      }
+
+      let list = Array.from(teamMap.values());
+
+      // Filter: only show active teams that either claimed a slot, have scores > 0, or custom name
+      const activeList = list.filter((t) => t.claimed || t.totalScore > 0 || (t.groupName && t.groupName !== `Kelompok ${t.teamNumber}`));
+      if (activeList.length > 0) {
+        list = activeList;
       }
 
       // Sort: 1. Total Score DESC, 2. Correct Answers DESC, 3. Completion Time ASC

@@ -12,8 +12,9 @@ import { exportSessionToCSV } from '../services/export-service.js';
 import { networkService } from '../services/network-service.js';
 import { loadStyle } from '../utils/asset-loader.js';
 
-export function renderLeaderboardView(container, { sessionCode, teamNumber, onHome, onPhaseChange }) {
-  loadStyle('css/leaderboard.css?v=2.7');
+export function renderLeaderboardView(container, { sessionCode, teamNumber, isAdmin = false, onHome, onPhaseChange }) {
+  loadStyle('css/leaderboard.css?v=3.3');
+  const effectiveSessionCode = sessionCode || (typeof localStorage !== 'undefined' ? (localStorage.getItem('tc_active_admin_session') || firebaseService.getStoredTeamSession()?.sessionCode) : null);
   let sessionUnsubscribe = null;
   let currentSession = null;
   let detachNet = null;
@@ -26,7 +27,7 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
       <header class="tc-lb-header">
         <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
           <div id="lb-net-badge-wrap"></div>
-          <div class="tc-session-tag">SESI KELAS: <strong>${sessionCode}</strong></div>
+          <div class="tc-session-tag">SESI KELAS: <strong>${effectiveSessionCode || '-'}</strong></div>
         </div>
 
         <div class="tc-live-indicator-pill">
@@ -131,7 +132,7 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
       <!-- Footer Action -->
       <div class="tc-lb-footer" style="text-align:center; margin-top:2.5rem; margin-bottom:2rem;">
         <button id="btn-lb-home" class="tc-btn tc-btn-primary tc-btn-large" type="button">
-          <span>KEMBALI KE DASHBOARD</span>
+          <span>${isAdmin ? 'KEMBALI KE DASHBOARD GURU' : 'KEMBALI KE DASHBOARD'}</span>
           <span>🏠</span>
         </button>
       </div>
@@ -159,7 +160,7 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
   btnExport.addEventListener('click', () => {
     audio.playClick();
     if (currentSession) {
-      exportSessionToCSV(sessionCode, currentSession);
+      exportSessionToCSV(effectiveSessionCode, currentSession);
     }
   });
 
@@ -192,12 +193,12 @@ export function renderLeaderboardView(container, { sessionCode, teamNumber, onHo
   }
 
   // Realtime Leaderboard Listener
-  sessionUnsubscribe = firebaseService.listenToLeaderboard(sessionCode, (sortedTeams, session) => {
+  sessionUnsubscribe = firebaseService.listenToLeaderboard(effectiveSessionCode, (sortedTeams, session) => {
     if (!session) return;
     currentSession = session;
 
-    // Check if teacher reset to LOBBY
-    if (session.currentPhase && session.currentPhase === 'LOBBY') {
+    // Check if teacher reset to LOBBY (only redirect student views, allow admin to stay)
+    if (session.currentPhase && session.currentPhase === 'LOBBY' && !isAdmin) {
       audio.playPhaseTransition();
       cleanup();
       if (onPhaseChange) onPhaseChange('LOBBY', session);

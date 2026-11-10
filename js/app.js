@@ -344,6 +344,10 @@ class ChampionsOfCalorApp {
         this.currentViewInstance = renderAdminView(this.appContainer, {
           onExit: () => {
             this.navigate('home');
+          },
+          onOpenLeaderboard: (sessionCode) => {
+            this.state.sessionCode = sessionCode || localStorage.getItem('tc_active_admin_session');
+            this.navigate('leaderboard');
           }
         });
         break;
@@ -405,11 +409,18 @@ class ChampionsOfCalorApp {
 
       case 'leaderboard':
         loadStyle('css/leaderboard.css?v=3.3');
+        const activeAdminCode = localStorage.getItem('tc_active_admin_session');
+        const activeCode = this.state.sessionCode || activeAdminCode;
         this.currentViewInstance = renderLeaderboardView(this.appContainer, {
-          sessionCode: this.state.sessionCode,
+          sessionCode: activeCode,
           teamNumber: this.state.teamNumber,
+          isAdmin: !this.state.teamNumber && !isMobileDevice(),
           onHome: () => {
-            this.resetToHome();
+            if (!this.state.teamNumber && !isMobileDevice()) {
+              this.navigate('admin');
+            } else {
+              this.resetToHome();
+            }
           },
           onPhaseChange: (newPhase) => {
             this.routeByPhase(newPhase);
