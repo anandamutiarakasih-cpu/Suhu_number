@@ -28,9 +28,12 @@ export function exportSessionToCSV(sessionCode, sessionData) {
     'Nama Kelompok',
     'Jumlah Anggota',
     'Daftar Anggota (Nama & Absen)',
-    'Skor Babak 1 (Start Champ - Maks 50)',
-    'Skor Babak 2 (Cryptarithm War - Maks 50)',
-    'Total Skor (Maks 100)',
+    'Skor Game 1 (Number Chains)',
+    'Skor Game 2 (Start Champ)',
+    'Skor Game 3 (Cryptarithm War)',
+    'Total Poin',
+    'Jawaban Benar',
+    'Waktu Penyelesaian (Detik)',
     'Predikat',
     'Status'
   ];
@@ -46,11 +49,14 @@ export function exportSessionToCSV(sessionCode, sessionData) {
       `"${(t.name || '').replace(/"/g, '""')}"`,
       (t.members || []).length,
       `"${memberStr.replace(/"/g, '""')}"`,
+      t.scores?.game1 || 0,
       t.scores?.game2 || 0,
       t.scores?.game3 || 0,
       t.scores?.total || 0,
+      t.correctAnswers?.total || 0,
+      t.completionTime || 0,
       `"${t.predicate || 'Temperature Rookie'}"`,
-      t.ready ? 'Siap' : 'Menunggu'
+      t.status || (t.ready ? 'Siap' : 'Menunggu')
     ].join(',');
   });
 

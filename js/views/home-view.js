@@ -84,20 +84,27 @@ export function renderHomeView(container, { onJoinTeam, onOpenAdmin }) {
         </div>
       </div>
 
-      <!-- 2 Challenge Showcase Overview (Start Champ & Cryptarithm War) -->
+      <!-- 3 Challenge Showcase Overview (Number Chains, Start Champ, Cryptarithm War) -->
       <div class="tc-preview-bar">
         <div class="tc-preview-item">
           <span class="tc-item-num">01</span>
           <div class="tc-item-content">
-            <strong>Start Champ</strong>
-            <span>Mencocokkan Konsep & Ilustrasi Kalor (Maks 50 Pts)</span>
+            <strong>Number Chains</strong>
+            <span>Rantai Urutan Peristiwa Kalor (100 Pts/Soal + Bonus)</span>
           </div>
         </div>
         <div class="tc-preview-item">
           <span class="tc-item-num">02</span>
           <div class="tc-item-content">
+            <strong>Start Champ</strong>
+            <span>Mencocokkan Konsep & Ilustrasi Kalor (100 Pts/Soal + Bonus)</span>
+          </div>
+        </div>
+        <div class="tc-preview-item">
+          <span class="tc-item-num">03</span>
+          <div class="tc-item-content">
             <strong>Cryptarithm War</strong>
-            <span>Teka-Teki Angka & Rumus Kalor (Maks 50 Pts)</span>
+            <span>Teka-Teki Angka & Rumus Kalor (100 Pts/Soal + Bonus)</span>
           </div>
         </div>
       </div>

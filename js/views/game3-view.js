@@ -1,31 +1,35 @@
 /**
  * CHAMPIONS OF CALOR: CLASH OF SCIENCE
- * Game 3 - Cryptarithm War View (Heat Formula Puzzles & Scratchpad)
- * 6 Academic Calculation Challenges with Keypad & Digital Whiteboard (Max 35 Pts)
+ * Game 3 - Cryptarithm War View (Formula Puzzles & Calculations)
+ * 6 Quantitative Heat Challenges with In-App Scratchpad & Keypad
+ * Standardized Point System: 100 Base + 0-20 Speed Bonus per Puzzle
  */
 
 import { CRYPTARITHM_DATA } from '../data/cryptarithm-data.js';
 import { SyncTimer } from '../components/timer.js';
+import { Scratchpad } from '../components/scratchpad.js';
 import { firebaseService } from '../services/firebase-service.js';
 import { audio } from '../services/audio-service.js';
 import { toast } from '../components/notification.js';
 import { showLabModal } from '../components/modal.js';
-import { Scratchpad } from '../components/scratchpad.js';
 import { networkService } from '../services/network-service.js';
 import { loadStyle } from '../utils/asset-loader.js';
+import { showInGameLeaderboardModal } from '../components/in-game-leaderboard-modal.js';
 
 export function renderGame3View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
-  loadStyle('css/game3.css?v=2.4');
+  loadStyle('css/game3.css?v=2.7');
+
   let currentIndex = 0;
+  let inputValues = {};
+  let activeInputId = null;
   let timerInstance = null;
+  let scratchpadInstance = null;
   let sessionUnsubscribe = null;
   let correctCount = 0;
-  let activeInputId = null;
-  let inputValues = {}; // inputId -> string
-  let scratchpadInstance = null;
   let isChecking = false;
   let detachNet = null;
   let countdownTimer = null;
+  const PUZZLE_DURATION_SECONDS = 90;
 
   // Ensure heartbeat is alive
   networkService.startHeartbeat(sessionCode, teamNumber);
@@ -35,11 +39,31 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     if (!session) return;
     if (session.currentPhase === 'LOBBY') {
       cleanup();
-      if (onPhaseChange) onPhaseChange('LOBBY', session);
+      if (onPhaseChange) onPhaseChange(session.currentPhase, session);
     }
   });
 
-  loadPuzzle(currentIndex);
+  // Resume progress if page was refreshed
+  firebaseService.getSession(sessionCode).then((session) => {
+    const answered = session?.teams?.[`team_${teamNumber}`]?.answeredQuestions?.game3 || {};
+    // Count already correct
+    Object.values(answered).forEach((a) => {
+      if (a?.isCorrect) correctCount++;
+    });
+
+    for (let i = 0; i < CRYPTARITHM_DATA.length; i++) {
+      if (!answered[CRYPTARITHM_DATA[i].id]) {
+        currentIndex = i;
+        break;
+      }
+      if (i === CRYPTARITHM_DATA.length - 1) {
+        currentIndex = CRYPTARITHM_DATA.length; // All done
+      }
+    }
+    loadPuzzle(currentIndex);
+  }).catch(() => {
+    loadPuzzle(0);
+  });
 
   function loadPuzzle(index) {
     if (index >= CRYPTARITHM_DATA.length) {
@@ -50,6 +74,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     const data = CRYPTARITHM_DATA[index];
     inputValues = {};
     activeInputId = data.inputs[0]?.id || null;
+    isChecking = false;
 
     renderPuzzleUI(data);
   }
@@ -60,8 +85,8 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
         <!-- Top Game HUD -->
         <div class="tc-game-hud">
           <div class="tc-hud-badge">
-            <span class="tc-badge-lab">BABAK 2 • CRYPTARITHM WAR</span>
-            <h2 class="tc-hud-title">TEKA-TEKI ANGKA KALOR (${currentIndex + 1}/6)</h2>
+            <span class="tc-badge-lab">GAME 3 • CRYPTARITHM WAR</span>
+            <h2 class="tc-hud-title">TEKA-TEKI ANGKA KALOR (${currentIndex + 1}/${CRYPTARITHM_DATA.length})</h2>
           </div>
 
           <div class="tc-hud-center">
@@ -71,12 +96,15 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
           <div class="tc-hud-team">
             <div class="tc-hud-team-actions">
               <div id="game-net-badge-wrap"></div>
+              <button type="button" class="tc-btn tc-btn-sm" id="btn-in-game-lb" style="background:rgba(56,189,248,0.18); border:1px solid rgba(56,189,248,0.4); color:var(--tc-sky); font-weight:700; border-radius:8px; padding:0.35rem 0.65rem;" title="Lihat Klasemen Realtime">
+                📊 Klasemen
+              </button>
               <span class="tc-hud-team-tag">KELOMPOK ${teamNumber}</span>
               <button type="button" class="tc-btn-hud-reset" id="btn-hud-reset" title="Keluar & Reset ke Dashboard">
                 🔄 Ke Dashboard
               </button>
             </div>
-            <span class="tc-hud-score-tag">TARGET: 50 PTS</span>
+            <span class="tc-hud-score-tag">100 PTS + BONUS (0-20)</span>
           </div>
         </div>
 
@@ -119,113 +147,112 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
                     class="tc-crypto-input-slot ${activeInputId === inp.id ? 'active-input' : ''}" 
                     id="input-${inp.id}" 
                     data-id="${inp.id}" 
-                    value="${inputValues[inp.id] || ''}" 
-                    placeholder="?" 
                     readonly 
-                  />
+                    placeholder="${inp.placeholder || '?'}"
+                    value="${inputValues[inp.id] || ''}">
                   <span class="tc-crypto-unit">${inp.unit}</span>
                 </div>
               `).join('')}
             </div>
           </div>
 
-          <!-- On-screen Numeric Keypad -->
-          <div class="tc-numpad-wrap">
+          <!-- On-Screen Numeric Keypad -->
+          <div class="tc-numpad-container">
             <div class="tc-numpad-grid">
-              <button type="button" class="tc-numpad-btn" data-key="1">1</button>
-              <button type="button" class="tc-numpad-btn" data-key="2">2</button>
-              <button type="button" class="tc-numpad-btn" data-key="3">3</button>
-              <button type="button" class="tc-numpad-btn" data-key="4">4</button>
-              <button type="button" class="tc-numpad-btn" data-key="5">5</button>
-              <button type="button" class="tc-numpad-btn" data-key="6">6</button>
-              <button type="button" class="tc-numpad-btn" data-key="7">7</button>
-              <button type="button" class="tc-numpad-btn" data-key="8">8</button>
-              <button type="button" class="tc-numpad-btn" data-key="9">9</button>
-              <button type="button" class="tc-numpad-btn action-btn clear-btn" data-key="C">C</button>
-              <button type="button" class="tc-numpad-btn" data-key="0">0</button>
-              <button type="button" class="tc-numpad-btn action-btn" data-key="BACK">⌫</button>
+              ${['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => `
+                <button type="button" class="tc-numpad-btn ${k === 'C' ? 'clear' : k === '⌫' ? 'backspace' : ''}" data-key="${k === '⌫' ? 'BACK' : k}">
+                  ${k}
+                </button>
+              `).join('')}
             </div>
           </div>
 
-          <!-- Submit Action -->
-          <div style="text-align:center;">
-            <button id="btn-check-crypto" class="tc-btn tc-btn-primary tc-btn-large">
-              <span>PERIKSA JAWABAN</span>
-              <span>✓</span>
+          <!-- Actions -->
+          <div class="tc-crypto-actions">
+            <button id="btn-toggle-scratch" class="tc-btn tc-btn-secondary" type="button">
+              <span>📝 Buka Kertas Cakar</span>
+            </button>
+            <button id="btn-check-crypto" class="tc-btn tc-btn-primary tc-btn-large" type="button">
+              <span>🔒 KUNCI & PERIKSA JAWABAN</span>
+              <span class="tc-btn-arrow">➔</span>
             </button>
           </div>
         </div>
 
-        <!-- Floating Kertas Cakar Button -->
-        <button id="btn-toggle-scratch" class="tc-scratchpad-toggle" title="Buka Kertas Cakar Digital">
-          <span>✏️</span>
-          <span>Kertas Cakar</span>
-        </button>
-
-        <!-- Scratchpad Drawer Overlay -->
-        <div id="scratchpad-drawer" class="tc-scratchpad-drawer">
-          <div class="tc-scratch-header">
-            <div style="font-weight:700; color:var(--tc-cream); display:flex; align-items:center; gap:0.5rem;">
-              <span>✏️</span> <span>KERTAS CAKAR DIGITAL</span>
+        <!-- Floating Slide-up Scratchpad Drawer -->
+        <div class="tc-scratchpad-drawer" id="scratchpad-drawer">
+          <div class="tc-scratchpad-header">
+            <div class="tc-scratch-title">
+              <span>✏️</span>
+              <span>Kertas Cakar Digital (Hitung Rumus Kalor)</span>
             </div>
-            <div class="tc-scratch-tools">
-              <button id="btn-scratch-clear" class="tc-btn tc-btn-sm tc-btn-ghost danger">Bersihkan</button>
-              <button id="btn-scratch-undo" class="tc-btn tc-btn-sm tc-btn-secondary">Undo</button>
-              <button id="btn-scratch-close" class="tc-btn tc-btn-sm tc-btn-outline">✕ Tutup</button>
+            <div class="tc-scratch-actions">
+              <button id="btn-scratch-undo" class="tc-btn-icon" type="button" title="Undo">↩</button>
+              <button id="btn-scratch-clear" class="tc-btn-icon" type="button" title="Bersihkan">🗑️</button>
+              <button id="btn-scratch-close" class="tc-btn-icon" type="button" title="Tutup">✕</button>
             </div>
           </div>
-          <canvas id="scratch-canvas" class="tc-scratch-canvas"></canvas>
+          <div class="tc-scratchpad-body">
+            <canvas id="scratch-canvas"></canvas>
+          </div>
         </div>
       </div>
     `;
 
     // Timer HUD
     const timerBox = container.querySelector('#game3-timer-container');
-    firebaseService.getSession(sessionCode).then((session) => {
-      const startTime = session?.phaseStartTime || Date.now();
-      const duration = session?.settings?.game3Duration || 240;
+    if (timerInstance) timerInstance.stop();
 
-      if (timerInstance) timerInstance.stop();
-      timerInstance = new SyncTimer({
-        container: timerBox,
-        durationSec: duration,
-        startTimeMs: startTime,
-        getServerTime: () => firebaseService.getServerTime(),
-        onComplete: () => {
-          toast.warning('Waktu Game 3 berakhir!');
-          finishGame3();
-        }
-      });
+    timerInstance = new SyncTimer({
+      durationSeconds: PUZZLE_DURATION_SECONDS,
+      onTick: (rem) => {
+        if (rem <= 10 && rem > 0) audio.playWarning();
+      },
+      onTimeUp: () => {
+        toast.warning('Waktu teka-teki ini telah habis! Jawaban diperiksa otomatis.');
+        evaluatePuzzle(data, true);
+      }
     });
+    timerInstance.mount(timerBox);
+    timerInstance.start();
 
-    initScratchpadDrawer();
-    attachKeypadInteractions(data);
-
+    // Attach Network Latency Monitor
     if (detachNet) detachNet();
     const netWrap = container.querySelector('#game-net-badge-wrap');
     if (netWrap) detachNet = networkService.attachBadge(netWrap);
+
+    const btnInGameLB = container.querySelector('#btn-in-game-lb');
+    if (btnInGameLB) {
+      btnInGameLB.addEventListener('click', () => {
+        showInGameLeaderboardModal(sessionCode, teamNumber);
+      });
+    }
 
     const btnHudReset = container.querySelector('#btn-hud-reset');
     if (btnHudReset) {
       btnHudReset.addEventListener('click', handleResetClick);
     }
+
+    // Attach Keypad & Scratchpad
+    attachScratchpad();
+    attachKeypadInteractions(data);
   }
 
   function handleResetClick() {
     audio.playClick();
     showLabModal({
-      title: 'PERINGATAN RESET KE DASHBOARD',
+      title: 'KELUAR DARI GAME 3?',
       contentHtml: `
         <div style="font-size:0.95rem; color:#f1f5f9; line-height:1.6;">
           <p style="margin-bottom:0.75rem;">
-            Apakah Anda yakin ingin keluar dari permainan dan kembali ke Dashboard awal?
+            Apakah Anda yakin ingin keluar dari sesi permainan Game 3?
           </p>
           <div style="background:rgba(239, 68, 68, 0.15); border-left:3px solid #ef4444; padding:0.85rem 1rem; border-radius:8px; font-size:0.88rem; color:#fca5a5; line-height:1.5;">
-            ⚠️ <strong>Perhatian:</strong> Seluruh data sesi dan progres permainan Anda akan <strong>direset</strong> dan kembali ke <strong>Dashboard awal</strong>.
+            ⚠️ <strong>Perhatian:</strong> Skor yang sudah terkumpul tetap aman di database, namun Anda akan keluar dari room permainan.
           </div>
         </div>
       `,
-      confirmText: 'Ya, Reset & Ke Dashboard',
+      confirmText: 'Ya, Keluar ke Dashboard',
       cancelText: 'Batal (Tetap Bermain)',
       onConfirm: async () => {
         cleanup();
@@ -234,9 +261,9 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     });
   }
 
-  function initScratchpadDrawer() {
-    const toggleBtn = container.querySelector('#btn-toggle-scratch');
+  function attachScratchpad() {
     const drawer = container.querySelector('#scratchpad-drawer');
+    const toggleBtn = container.querySelector('#btn-toggle-scratch');
     const closeBtn = container.querySelector('#btn-scratch-close');
     const clearBtn = container.querySelector('#btn-scratch-clear');
     const undoBtn = container.querySelector('#btn-scratch-undo');
@@ -287,6 +314,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
 
     // Keypad clicks
     keypad.addEventListener('click', (e) => {
+      if (isChecking) return;
       const btn = e.target.closest('.tc-numpad-btn');
       if (!btn || !activeInputId) return;
       audio.playClick();
@@ -299,14 +327,14 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
       } else if (key === 'BACK') {
         inputValues[activeInputId] = currentVal.slice(0, -1);
       } else {
-        const targetInput = data.inputs.find((i) => i.id === activeInputId);
-        const maxLen = targetInput?.maxLength || 6;
+        const inpConfig = data.inputs.find((i) => i.id === activeInputId);
+        const maxLen = inpConfig?.maxLength || 6;
         if (currentVal.length < maxLen) {
           inputValues[activeInputId] = currentVal + key;
         }
       }
 
-      // Update input slot text
+      // Update input slot value
       const targetSlot = container.querySelector(`#input-${activeInputId}`);
       if (targetSlot) {
         targetSlot.value = inputValues[activeInputId];
@@ -325,41 +353,72 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
         }
       }
 
-      isChecking = true;
-      evaluatePuzzle(data);
+      evaluatePuzzle(data, false);
     });
   }
 
-  function evaluatePuzzle(data) {
-    let isAllCorrect = true;
+  async function evaluatePuzzle(data, isTimeout = false) {
+    if (isChecking) return;
+    isChecking = true;
 
-    for (const inp of data.inputs) {
-      const userVal = (inputValues[inp.id] || '').trim();
-      const expected = String(inp.expected).trim();
-      if (userVal !== expected) {
-        isAllCorrect = false;
+    const remaining = timerInstance ? timerInstance.getRemainingSeconds() : 0;
+    if (timerInstance) timerInstance.stop();
+
+    // Disable buttons to lock inputs
+    const allBtns = container.querySelectorAll('.tc-numpad-btn, #btn-check-crypto');
+    allBtns.forEach((b) => { b.disabled = true; });
+
+    let isAllCorrect = !isTimeout;
+    if (!isTimeout) {
+      for (const inp of data.inputs) {
+        const userVal = (inputValues[inp.id] || '').trim();
+        const expected = String(inp.expected).trim();
+        if (userVal !== expected) {
+          isAllCorrect = false;
+        }
       }
     }
 
-    if (isAllCorrect) {
-      audio.playCorrect();
-      correctCount++;
-      toast.success(`🎉 TEPAT! Teka-teki ${currentIndex + 1} berhasil dipecahkan!`);
+    try {
+      const res = await firebaseService.submitQuestionAnswer(sessionCode, teamNumber, 'game3', data.id, {
+        isCorrect: isAllCorrect,
+        remainingSeconds: remaining,
+        totalSeconds: PUZZLE_DURATION_SECONDS,
+        answerData: { inputValues, isTimeout }
+      });
+
+      if (isAllCorrect) {
+        audio.playCorrect();
+        correctCount++;
+        toast.success(`🎉 TEPAT! ${res.scoreResult.breakdownText}`);
+      } else {
+        audio.playWrong();
+        toast.error('❌ Angka belum tepat. Simak langkah solusi rumus kalor berikut!');
+      }
 
       setTimeout(() => {
-        showSolutionModal(data);
+        showSolutionModal(data, isAllCorrect, res.scoreResult);
       }, 700);
-    } else {
-      audio.playWrong();
-      toast.error('Angka belum tepat. Cek kembali perhitungan atau gunakan kertas cakar!');
-      isChecking = false;
+    } catch (err) {
+      toast.error('Gagal mengirim skor: ' + err.message);
+      showSolutionModal(data, isAllCorrect, { totalPoints: isAllCorrect ? 100 : 0 });
     }
   }
 
-  function showSolutionModal(data) {
+  function showSolutionModal(data, isCorrect, scoreResult) {
+    const pointsBadge = isCorrect
+      ? `<div style="background:rgba(34,197,94,0.15); border:1.5px solid #22c55e; color:#4ade80; padding:0.6rem 1rem; border-radius:10px; font-weight:800; font-family:var(--font-mono); margin-bottom:1rem; font-size:1.1rem; text-align:center;">
+           🏆 +${scoreResult?.totalPoints || 100} POIN (100 Jawaban Benar ${scoreResult?.speedBonus ? `+ ${scoreResult.speedBonus} Bonus Kecepatan` : ''})
+         </div>`
+      : `<div style="background:rgba(239,68,68,0.15); border:1.5px solid #ef4444; color:#f87171; padding:0.6rem 1rem; border-radius:10px; font-weight:800; font-family:var(--font-mono); margin-bottom:1rem; font-size:1.1rem; text-align:center;">
+           ❌ +0 POIN (Perhitungan Belum Tepat)
+         </div>`;
+
     const content = `
       <div class="tc-modal-explanation">
-        <p style="font-size:1rem; color:var(--tc-sky); margin-bottom:1rem; font-weight:700;">
+        ${pointsBadge}
+
+        <p style="font-size:1rem; color:var(--tc-sky); margin-bottom:0.85rem; font-weight:700;">
           Langkah Penyelesaian Rumus ${data.formula}:
         </p>
         <ol style="margin-left:1.25rem; display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1.25rem;">
@@ -386,13 +445,11 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
   }
 
   async function finishGame3() {
-    const remaining = timerInstance ? timerInstance.getRemainingSeconds() : 0;
     if (timerInstance) timerInstance.stop();
 
-    toast.info('Menyimpan skor Babak 2: Cryptarithm War ke database...');
+    toast.info('Menyimpan skor Game 3 ke database...');
     try {
-      const speedBonus = remaining > 20 ? 5 : Math.round((remaining / 240) * 5 * 10) / 10;
-      const res = await firebaseService.submitGame3Score(sessionCode, teamNumber, correctCount, CRYPTARITHM_DATA.length, speedBonus);
+      const res = await firebaseService.submitGame3Score(sessionCode, teamNumber, correctCount, CRYPTARITHM_DATA.length);
       audio.playFanfare();
 
       container.innerHTML = `
@@ -410,11 +467,11 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
             <p style="color:#94a3b8; margin-bottom:1rem; font-size:0.95rem;">
               Kelompok ${teamNumber} berhasil memecahkan ${correctCount} dari ${CRYPTARITHM_DATA.length} teka-teki rumus kalor.
             </p>
-            <div style="font-size:2.5rem; font-weight:800; color:var(--tc-orange); margin-bottom:0.75rem; font-family:var(--font-mono);">
+            <div style="font-size:2.5rem; font-weight:800; color:var(--tc-orange); margin-bottom:0.5rem; font-family:var(--font-mono);">
               +${res.score} POIN
             </div>
-            <div style="font-size:1.15rem; color:var(--tc-yellow); font-weight:700; margin-bottom:1.5rem;">
-              TOTAL AKHIR KELOMPOK: ${res.totalScore} POIN
+            <div style="font-size:1.25rem; color:var(--tc-yellow); font-weight:800; margin-bottom:1.5rem; font-family:var(--font-mono);">
+              TOTAL AKHIR KOMPETISI: ${res.totalScore} POIN
             </div>
 
             <!-- Auto-progression action buttons -->
@@ -443,8 +500,8 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
       const btnExitLink = container.querySelector('#btn-complete-exit-link');
       if (btnExitLink) btnExitLink.addEventListener('click', handleResetClick);
 
-      // Auto progression handler
-      const proceedToLeaderboard = () => {
+      // Auto progression handler to Leaderboard
+      const proceedToLB = () => {
         if (countdownTimer) {
           clearInterval(countdownTimer);
           countdownTimer = null;
@@ -461,7 +518,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
       if (btnNext) {
         btnNext.addEventListener('click', () => {
           audio.playClick();
-          proceedToLeaderboard();
+          proceedToLB();
         });
       }
 
@@ -473,7 +530,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
         if (secondsLeft <= 0) {
           clearInterval(countdownTimer);
           countdownTimer = null;
-          proceedToLeaderboard();
+          proceedToLB();
         }
       }, 1000);
 
@@ -491,6 +548,7 @@ export function renderGame3View(container, { sessionCode, teamNumber, onGameComp
     if (timerInstance) timerInstance.stop();
     if (sessionUnsubscribe) sessionUnsubscribe();
     if (detachNet) detachNet();
+    if (scratchpadInstance) scratchpadInstance.destroy();
   }
 
   return {

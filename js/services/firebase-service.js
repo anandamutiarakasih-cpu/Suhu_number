@@ -6,6 +6,7 @@
 
 import { firebaseConfig } from '../config/firebase-config.js';
 import { getPredicate } from '../data/predicates.js';
+import { calculateQuestionScore } from './score-service.js';
 
 class FirebaseService {
   constructor() {
@@ -307,37 +308,71 @@ class FirebaseService {
       }
     }
 
+    const now = this.getServerTime();
     const teamData = {
       number: num,
       name: (teamName || `Kelompok ${num}`).trim(),
       members: Array.isArray(members) ? members : [],
       claimed: true,
       ready: true,
-      joinedAt: this.getServerTime(),
+      joinedAt: now,
       scores: {
         game1: 0,
         game2: 0,
         game3: 0,
         total: 0
       },
+      correctAnswers: {
+        game1: 0,
+        game2: 0,
+        game3: 0,
+        total: 0
+      },
+      answeredQuestions: {
+        game1: {},
+        game2: {},
+        game3: {}
+      },
+      completionTime: 0,
       progress: {
         game1Submitted: false,
         game2Submitted: false,
         game3Submitted: false
       },
-      predicate: 'Temperature Rookie'
+      predicate: 'Temperature Rookie',
+      status: 'LOBBY'
     };
 
     if (!session.teams) session.teams = {};
     session.teams[`team_${num}`] = teamData;
 
+    // Leaderboard dedicated node for ultra-fast, isolated room queries
+    if (!session.leaderboard) session.leaderboard = {};
+    const lbEntry = {
+      groupId: `team_${num}`,
+      groupName: teamData.name,
+      teamNumber: num,
+      numberChainsScore: 0,
+      startChampScore: 0,
+      cryptarithmWarScore: 0,
+      totalScore: 0,
+      correctAnswers: 0,
+      completionTime: 0,
+      status: 'LOBBY',
+      updatedAt: now
+    };
+    session.leaderboard[`team_${num}`] = lbEntry;
+
     this.sessionsCache.set(sessionCode, session);
 
-    // Non-blocking background sync
-    if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
+    // Non-blocking background sync to Firebase RTDB
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
       try {
-        const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${num}`);
-        const p = this.fbSet(teamRef, teamData);
+        const rootRef = this.fbRef(this.db, `sessions/${sessionCode}`);
+        const p = this.fbUpdate(rootRef, {
+          [`teams/team_${num}`]: teamData,
+          [`leaderboard/team_${num}`]: lbEntry
+        });
         if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {}
     }
@@ -376,16 +411,32 @@ class FirebaseService {
         game3: 0,
         total: 0
       },
+      correctAnswers: {
+        game1: 0,
+        game2: 0,
+        game3: 0,
+        total: 0
+      },
+      answeredQuestions: {
+        game1: {},
+        game2: {},
+        game3: {}
+      },
+      completionTime: 0,
       progress: {
         game1Submitted: false,
         game2Submitted: false,
         game3Submitted: false
       },
-      predicate: 'Temperature Rookie'
+      predicate: 'Temperature Rookie',
+      status: 'LOBBY'
     };
 
     if (!session.teams) session.teams = {};
     session.teams[`team_${num}`] = resetTeam;
+
+    if (!session.leaderboard) session.leaderboard = {};
+    delete session.leaderboard[`team_${num}`];
 
     this.sessionsCache.set(sessionCode, session);
 
@@ -393,8 +444,9 @@ class FirebaseService {
     if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
       try {
         const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${num}`);
-        const p = this.fbSet(teamRef, resetTeam);
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        this.fbSet(teamRef, resetTeam).catch(() => {});
+        const lbRef = this.fbRef(this.db, `sessions/${sessionCode}/leaderboard/team_${num}`);
+        this.fbSet(lbRef, null).catch(() => {});
       } catch (e) {
         console.warn('Firebase leaveSession sync error:', e);
       }
@@ -471,7 +523,122 @@ class FirebaseService {
   }
 
   /**
-   * SUBMIT GAME 1 (NUMBER CHAINS - MAX 30 PTS)
+   * SUBMIT QUESTION ANSWER (STANDARDIZED: 100 PTS BASE + 0-20 SPEED BONUS)
+   * Prevents duplicate scoring on refresh, locks answers, updates leaderboard in realtime
+   */
+  async submitQuestionAnswer(sessionCode, teamNumber, gameKey, questionId, { isCorrect, remainingSeconds = 0, totalSeconds = 60, answerData = null }) {
+    const num = parseInt(teamNumber, 10);
+    const session = await this.getSession(sessionCode);
+    if (!session || !session.teams || !session.teams[`team_${num}`]) {
+      throw new Error('Data kelompok tidak ditemukan.');
+    }
+
+    const team = session.teams[`team_${num}`];
+    if (!team.scores) team.scores = { game1: 0, game2: 0, game3: 0, total: 0 };
+    if (!team.correctAnswers) team.correctAnswers = { game1: 0, game2: 0, game3: 0, total: 0 };
+    if (!team.answeredQuestions) team.answeredQuestions = { game1: {}, game2: {}, game3: {} };
+    if (!team.answeredQuestions[gameKey]) team.answeredQuestions[gameKey] = {};
+
+    // 1. Check if already answered -> PREVENT DUPLICATE SCORING
+    if (team.answeredQuestions[gameKey][questionId]) {
+      const existing = team.answeredQuestions[gameKey][questionId];
+      return {
+        success: true,
+        alreadyAnswered: true,
+        scoreResult: {
+          isCorrect: existing.isCorrect,
+          basePoints: existing.basePoints || 0,
+          speedBonus: existing.speedBonus || 0,
+          totalPoints: existing.score || 0,
+          breakdownText: existing.breakdownText || `${existing.score || 0} Poin (Telah Terkunci)`
+        },
+        currentScore: team.scores[gameKey] || 0,
+        totalScore: team.scores.total || 0,
+        correctCount: team.correctAnswers[gameKey] || 0
+      };
+    }
+
+    // 2. Compute score using standardized calculation
+    const scoreResult = calculateQuestionScore({ isCorrect, remainingSeconds, totalSeconds });
+    const now = this.getServerTime();
+
+    // 3. Record answer locking
+    team.answeredQuestions[gameKey][questionId] = {
+      isCorrect: scoreResult.isCorrect,
+      score: scoreResult.totalPoints,
+      basePoints: scoreResult.basePoints,
+      speedBonus: scoreResult.speedBonus,
+      breakdownText: scoreResult.breakdownText,
+      answerData,
+      answeredAt: now
+    };
+
+    // 4. Accumulate points and correct answer count
+    team.scores[gameKey] = (team.scores[gameKey] || 0) + scoreResult.totalPoints;
+    if (scoreResult.isCorrect) {
+      team.correctAnswers[gameKey] = (team.correctAnswers[gameKey] || 0) + 1;
+      team.correctAnswers.total = (team.correctAnswers.total || 0) + 1;
+    }
+
+    // 5. Accumulate total score & completion time
+    const timeSpent = Math.max(0, totalSeconds - remainingSeconds);
+    team.completionTime = (team.completionTime || 0) + timeSpent;
+    team.scores.total = (team.scores.game1 || 0) + (team.scores.game2 || 0) + (team.scores.game3 || 0);
+    team.predicate = getPredicate(team.scores.total).title;
+    team.status = 'PLAYING';
+
+    // 6. Update Leaderboard Entry
+    if (!session.leaderboard) session.leaderboard = {};
+    session.leaderboard[`team_${num}`] = {
+      groupId: `team_${num}`,
+      groupName: team.name,
+      teamNumber: num,
+      numberChainsScore: team.scores.game1 || 0,
+      startChampScore: team.scores.game2 || 0,
+      cryptarithmWarScore: team.scores.game3 || 0,
+      totalScore: team.scores.total,
+      correctAnswers: team.correctAnswers.total || 0,
+      completionTime: team.completionTime || 0,
+      status: 'PLAYING',
+      updatedAt: now
+    };
+
+    this.sessionsCache.set(sessionCode, session);
+
+    // 7. Atomic multi-location Firebase RTDB sync
+    if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
+      try {
+        const rootRef = this.fbRef(this.db, `sessions/${sessionCode}`);
+        const updates = {
+          [`teams/team_${num}/scores/${gameKey}`]: team.scores[gameKey],
+          [`teams/team_${num}/scores/total`]: team.scores.total,
+          [`teams/team_${num}/correctAnswers/${gameKey}`]: team.correctAnswers[gameKey],
+          [`teams/team_${num}/correctAnswers/total`]: team.correctAnswers.total,
+          [`teams/team_${num}/completionTime`]: team.completionTime,
+          [`teams/team_${num}/predicate`]: team.predicate,
+          [`teams/team_${num}/status`]: 'PLAYING',
+          [`teams/team_${num}/answeredQuestions/${gameKey}/${questionId}`]: team.answeredQuestions[gameKey][questionId],
+          [`leaderboard/team_${num}`]: session.leaderboard[`team_${num}`]
+        };
+        const p = this.fbUpdate(rootRef, updates);
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (e) {}
+    }
+
+    this.notifySessionUpdate(sessionCode, session);
+
+    return {
+      success: true,
+      alreadyAnswered: false,
+      scoreResult,
+      currentScore: team.scores[gameKey],
+      totalScore: team.scores.total,
+      correctCount: team.correctAnswers[gameKey]
+    };
+  }
+
+  /**
+   * SUBMIT GAME 1 (NUMBER CHAINS COMPLETION)
    */
   async submitGame1Score(sessionCode, teamNumber, correctCount, totalStages = 5) {
     const session = await this.getSession(sessionCode);
@@ -480,138 +647,167 @@ class FirebaseService {
     }
 
     const team = session.teams[`team_${teamNumber}`];
-    let score = correctCount * 5;
-    if (correctCount === totalStages) {
-      score += 5; // Perfect 5/5 bonus
-    }
-    score = Math.min(30, Math.round(score * 10) / 10);
-
-    team.scores.game1 = score;
-    team.scores.total = Math.min(100, Math.round((team.scores.game1 + (team.scores.game2 || 0) + (team.scores.game3 || 0)) * 10) / 10);
-    team.predicate = getPredicate(team.scores.total).title;
     if (!team.progress) team.progress = {};
     team.progress.game1Submitted = true;
+    team.status = 'PLAYING';
+
+    team.scores.total = (team.scores.game1 || 0) + (team.scores.game2 || 0) + (team.scores.game3 || 0);
+    team.predicate = getPredicate(team.scores.total).title;
+
+    if (!session.leaderboard) session.leaderboard = {};
+    session.leaderboard[`team_${teamNumber}`] = {
+      groupId: `team_${teamNumber}`,
+      groupName: team.name,
+      teamNumber: parseInt(teamNumber, 10),
+      numberChainsScore: team.scores.game1 || 0,
+      startChampScore: team.scores.game2 || 0,
+      cryptarithmWarScore: team.scores.game3 || 0,
+      totalScore: team.scores.total,
+      correctAnswers: team.correctAnswers?.total || 0,
+      completionTime: team.completionTime || 0,
+      status: 'PLAYING',
+      updatedAt: this.getServerTime()
+    };
 
     this.sessionsCache.set(sessionCode, session);
 
     if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
       try {
-        const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${teamNumber}`);
-        const p = this.fbUpdate(teamRef, {
-          'scores/game1': score,
-          'scores/total': team.scores.total,
-          'progress/game1Submitted': true,
-          predicate: team.predicate
-        });
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        const rootRef = this.fbRef(this.db, `sessions/${sessionCode}`);
+        this.fbUpdate(rootRef, {
+          [`teams/team_${teamNumber}/progress/game1Submitted`]: true,
+          [`teams/team_${teamNumber}/scores/total`]: team.scores.total,
+          [`teams/team_${teamNumber}/predicate`]: team.predicate,
+          [`leaderboard/team_${teamNumber}`]: session.leaderboard[`team_${teamNumber}`]
+        }).catch(() => {});
       } catch (e) {}
     }
 
     this.notifySessionUpdate(sessionCode, session);
     return {
       success: true,
-      score,
+      score: team.scores.game1 || 0,
       totalScore: team.scores.total,
-      correctCount,
-      totalStages,
-      isPerfect: correctCount === totalStages
+      correctCount: team.correctAnswers?.game1 || correctCount,
+      totalStages
     };
   }
 
   /**
-   * SUBMIT GAME 2 (START CHAMP MATCHING - MAX 50 PTS)
+   * SUBMIT GAME 2 (START CHAMP MATCHING COMPLETION)
    */
-  async submitGame2Score(sessionCode, teamNumber, correctCount, totalItems = 12, speedBonus = 0) {
+  async submitGame2Score(sessionCode, teamNumber, correctCount, totalItems = 12) {
     const session = await this.getSession(sessionCode);
     if (!session || !session.teams || !session.teams[`team_${teamNumber}`]) {
       throw new Error('Data kelompok tidak ditemukan.');
     }
 
     const team = session.teams[`team_${teamNumber}`];
-    let baseScore = (correctCount / totalItems) * 48;
-    let score = baseScore + (Number(speedBonus) || 0);
-    if (correctCount === totalItems) score = 50;
-    score = Math.min(50, Math.round(score * 10) / 10);
-
-    team.scores.game2 = score;
-    team.scores.total = Math.min(100, Math.round(((team.scores.game2 || 0) + (team.scores.game3 || 0)) * 10) / 10);
-    team.predicate = getPredicate(team.scores.total).title;
     if (!team.progress) team.progress = {};
     team.progress.game2Submitted = true;
+    team.status = 'PLAYING';
+
+    team.scores.total = (team.scores.game1 || 0) + (team.scores.game2 || 0) + (team.scores.game3 || 0);
+    team.predicate = getPredicate(team.scores.total).title;
+
+    if (!session.leaderboard) session.leaderboard = {};
+    session.leaderboard[`team_${teamNumber}`] = {
+      groupId: `team_${teamNumber}`,
+      groupName: team.name,
+      teamNumber: parseInt(teamNumber, 10),
+      numberChainsScore: team.scores.game1 || 0,
+      startChampScore: team.scores.game2 || 0,
+      cryptarithmWarScore: team.scores.game3 || 0,
+      totalScore: team.scores.total,
+      correctAnswers: team.correctAnswers?.total || 0,
+      completionTime: team.completionTime || 0,
+      status: 'PLAYING',
+      updatedAt: this.getServerTime()
+    };
 
     this.sessionsCache.set(sessionCode, session);
 
     if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
       try {
-        const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${teamNumber}`);
-        const p = this.fbUpdate(teamRef, {
-          'scores/game2': score,
-          'scores/total': team.scores.total,
-          'progress/game2Submitted': true,
-          predicate: team.predicate
-        });
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        const rootRef = this.fbRef(this.db, `sessions/${sessionCode}`);
+        this.fbUpdate(rootRef, {
+          [`teams/team_${teamNumber}/progress/game2Submitted`]: true,
+          [`teams/team_${teamNumber}/scores/total`]: team.scores.total,
+          [`teams/team_${teamNumber}/predicate`]: team.predicate,
+          [`leaderboard/team_${teamNumber}`]: session.leaderboard[`team_${teamNumber}`]
+        }).catch(() => {});
       } catch (e) {}
     }
 
     this.notifySessionUpdate(sessionCode, session);
     return {
       success: true,
-      score,
+      score: team.scores.game2 || 0,
       totalScore: team.scores.total,
-      correctCount,
+      correctCount: team.correctAnswers?.game2 || correctCount,
       totalItems
     };
   }
 
   /**
-   * SUBMIT GAME 3 (CRYPTARITHM WAR - MAX 50 PTS)
+   * SUBMIT GAME 3 (CRYPTARITHM WAR COMPLETION)
    */
-  async submitGame3Score(sessionCode, teamNumber, correctCount, totalItems = 6, speedBonus = 0) {
+  async submitGame3Score(sessionCode, teamNumber, correctCount, totalItems = 6) {
     const session = await this.getSession(sessionCode);
     if (!session || !session.teams || !session.teams[`team_${teamNumber}`]) {
       throw new Error('Data kelompok tidak ditemukan.');
     }
 
     const team = session.teams[`team_${teamNumber}`];
-    let baseScore = (correctCount / totalItems) * 48;
-    let score = baseScore + (Number(speedBonus) || 0);
-    if (correctCount === totalItems) score = 50;
-    score = Math.min(50, Math.round(score * 10) / 10);
-
-    team.scores.game3 = score;
-    team.scores.total = Math.min(100, Math.round(((team.scores.game2 || 0) + (team.scores.game3 || 0)) * 10) / 10);
-    team.predicate = getPredicate(team.scores.total).title;
     if (!team.progress) team.progress = {};
     team.progress.game3Submitted = true;
+    team.status = 'FINISHED';
+
+    team.scores.total = (team.scores.game1 || 0) + (team.scores.game2 || 0) + (team.scores.game3 || 0);
+    team.predicate = getPredicate(team.scores.total).title;
+
+    if (!session.leaderboard) session.leaderboard = {};
+    session.leaderboard[`team_${teamNumber}`] = {
+      groupId: `team_${teamNumber}`,
+      groupName: team.name,
+      teamNumber: parseInt(teamNumber, 10),
+      numberChainsScore: team.scores.game1 || 0,
+      startChampScore: team.scores.game2 || 0,
+      cryptarithmWarScore: team.scores.game3 || 0,
+      totalScore: team.scores.total,
+      correctAnswers: team.correctAnswers?.total || 0,
+      completionTime: team.completionTime || 0,
+      status: 'FINISHED',
+      updatedAt: this.getServerTime()
+    };
 
     this.sessionsCache.set(sessionCode, session);
 
     if (this.isFirebaseReady && this.db && this.fbRef && this.fbUpdate) {
       try {
-        const teamRef = this.fbRef(this.db, `sessions/${sessionCode}/teams/team_${teamNumber}`);
-        const p = this.fbUpdate(teamRef, {
-          'scores/game3': score,
-          'scores/total': team.scores.total,
-          'progress/game3Submitted': true,
-          predicate: team.predicate
-        });
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        const rootRef = this.fbRef(this.db, `sessions/${sessionCode}`);
+        this.fbUpdate(rootRef, {
+          [`teams/team_${teamNumber}/progress/game3Submitted`]: true,
+          [`teams/team_${teamNumber}/status`]: 'FINISHED',
+          [`teams/team_${teamNumber}/scores/total`]: team.scores.total,
+          [`teams/team_${teamNumber}/predicate`]: team.predicate,
+          [`leaderboard/team_${teamNumber}`]: session.leaderboard[`team_${teamNumber}`]
+        }).catch(() => {});
       } catch (e) {}
     }
 
     this.notifySessionUpdate(sessionCode, session);
     return {
       success: true,
-      score,
+      score: team.scores.game3 || 0,
       totalScore: team.scores.total,
-      correctCount,
+      correctCount: team.correctAnswers?.game3 || correctCount,
       totalItems
     };
   }
 
   /**
-   * RESET SESSION (CLEAR SCORES TO ZERO)
+   * RESET SESSION (CLEAR SCORES TO ZERO & RESET LEADERBOARD)
    */
   async resetSession(sessionCode) {
     const session = await this.getSession(sessionCode);
@@ -621,11 +817,33 @@ class FirebaseService {
     session.currentPhase = 'LOBBY';
     session.phaseStartTime = null;
     session.phaseDuration = 0;
+    session.leaderboard = {};
+
     if (session.teams) {
       Object.keys(session.teams).forEach((k) => {
         session.teams[k].scores = { game1: 0, game2: 0, game3: 0, total: 0 };
+        session.teams[k].correctAnswers = { game1: 0, game2: 0, game3: 0, total: 0 };
+        session.teams[k].answeredQuestions = { game1: {}, game2: {}, game3: {} };
+        session.teams[k].completionTime = 0;
+        session.teams[k].status = 'LOBBY';
         session.teams[k].progress = { game1Submitted: false, game2Submitted: false, game3Submitted: false };
         session.teams[k].predicate = 'Temperature Rookie';
+
+        if (session.teams[k].claimed) {
+          session.leaderboard[k] = {
+            groupId: k,
+            groupName: session.teams[k].name,
+            teamNumber: session.teams[k].number,
+            numberChainsScore: 0,
+            startChampScore: 0,
+            cryptarithmWarScore: 0,
+            totalScore: 0,
+            correctAnswers: 0,
+            completionTime: 0,
+            status: 'LOBBY',
+            updatedAt: this.getServerTime()
+          };
+        }
       });
     }
 
@@ -645,6 +863,7 @@ class FirebaseService {
 
   /**
    * SIMULATE 8 TEAMS FOR QUICK CLASS DEMONSTRATION
+   * Populates realistic points using 100-pt + speed bonus scale across all 3 games
    */
   async simulate8Teams(sessionCode) {
     const session = await this.getSession(sessionCode);
@@ -673,42 +892,73 @@ class FirebaseService {
     ];
 
     const sampleScores = [
-      { g2: 49.5, g3: 50 },     // 99.5 - Champion
-      { g2: 46.0, g3: 46.0 },   // 92.0 - Champion
-      { g2: 42.5, g3: 42.5 },   // 85.0 - Expert
-      { g2: 40.0, g3: 40.5 },   // 80.5 - Expert
-      { g2: 36.5, g3: 36.0 },   // 72.5 - Challenger
-      { g2: 33.0, g3: 33.0 },   // 66.0 - Challenger
-      { g2: 30.0, g3: 30.0 },   // 60.0 - Explorer
-      { g2: 24.0, g3: 24.0 }    // 48.0 - Rookie
+      { g1: 580, g2: 1350, g3: 710, correct: 23, time: 260 }, // 2640 - Champion
+      { g1: 520, g2: 1210, g3: 650, correct: 21, time: 290 }, // 2380 - Champion
+      { g1: 480, g2: 1080, g3: 590, correct: 19, time: 330 }, // 2150 - Expert
+      { g1: 440, g2: 960,  g3: 510, correct: 17, time: 360 }, // 1910 - Expert
+      { g1: 400, g2: 820,  g3: 450, correct: 15, time: 390 }, // 1670 - Challenger
+      { g1: 350, g2: 700,  g3: 380, correct: 13, time: 420 }, // 1430 - Challenger
+      { g1: 300, g2: 600,  g3: 320, correct: 11, time: 440 }, // 1220 - Explorer
+      { g1: 220, g2: 480,  g3: 200, correct: 8,  time: 470 }  // 900  - Rookie
     ];
 
     if (!session.teams) session.teams = {};
+    if (!session.leaderboard) session.leaderboard = {};
+    const now = this.getServerTime();
 
     for (let i = 1; i <= 8; i++) {
       const idx = i - 1;
       const sc = sampleScores[idx];
-      const total = Math.min(100, Math.round((sc.g2 + sc.g3) * 10) / 10);
+      const total = sc.g1 + sc.g2 + sc.g3;
 
-      session.teams[`team_${i}`] = {
+      const teamObj = {
         number: i,
         name: sampleNames[idx],
         members: sampleMembers[idx],
         claimed: true,
         ready: true,
-        joinedAt: this.getServerTime() - (idx * 5000),
+        joinedAt: now - (idx * 5000),
         scores: {
-          game1: 0,
+          game1: sc.g1,
           game2: sc.g2,
           game3: sc.g3,
           total
         },
+        correctAnswers: {
+          game1: Math.min(5, Math.round(sc.g1 / 115)),
+          game2: Math.min(12, Math.round(sc.g2 / 110)),
+          game3: Math.min(6, Math.round(sc.g3 / 115)),
+          total: sc.correct
+        },
+        answeredQuestions: {
+          game1: {},
+          game2: {},
+          game3: {}
+        },
+        completionTime: sc.time,
         progress: {
           game1Submitted: true,
           game2Submitted: true,
           game3Submitted: true
         },
+        status: 'FINISHED',
         predicate: getPredicate(total).title
+      };
+
+      session.teams[`team_${i}`] = teamObj;
+
+      session.leaderboard[`team_${i}`] = {
+        groupId: `team_${i}`,
+        groupName: teamObj.name,
+        teamNumber: i,
+        numberChainsScore: sc.g1,
+        startChampScore: sc.g2,
+        cryptarithmWarScore: sc.g3,
+        totalScore: total,
+        correctAnswers: sc.correct,
+        completionTime: sc.time,
+        status: 'FINISHED',
+        updatedAt: now - (idx * 3000)
       };
     }
 
@@ -716,14 +966,77 @@ class FirebaseService {
 
     if (this.isFirebaseReady && this.db && this.fbRef && this.fbSet) {
       try {
-        const teamsRef = this.fbRef(this.db, `sessions/${sessionCode}/teams`);
-        const p = this.fbSet(teamsRef, session.teams);
+        const rootRef = this.fbRef(this.db, `sessions/${sessionCode}`);
+        const p = this.fbUpdate(rootRef, {
+          teams: session.teams,
+          leaderboard: session.leaderboard
+        });
         if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {}
     }
 
     this.notifySessionUpdate(sessionCode, session);
     return session;
+  }
+
+  /**
+   * LISTEN TO LEADERBOARD REALTIME
+   * Connects to Firebase RTDB leaderboard node with multi-criteria sorting:
+   * 1. totalScore DESC
+   * 2. correctAnswers DESC
+   * 3. completionTime ASC
+   */
+  listenToLeaderboard(sessionCode, callback) {
+    if (!sessionCode) return () => {};
+    const cleanCode = String(sessionCode).trim().toUpperCase();
+
+    const compileLeaderboard = (session) => {
+      if (!session) return [];
+      let list = [];
+      if (session.leaderboard && Object.keys(session.leaderboard).length > 0) {
+        list = Object.values(session.leaderboard).filter(Boolean);
+      } else if (session.teams) {
+        list = Object.values(session.teams).filter((t) => t && (t.claimed || t.scores?.total > 0)).map((t) => ({
+          groupId: `team_${t.number}`,
+          groupName: t.name || `Kelompok ${t.number}`,
+          teamNumber: t.number,
+          numberChainsScore: t.scores?.game1 || 0,
+          startChampScore: t.scores?.game2 || 0,
+          cryptarithmWarScore: t.scores?.game3 || 0,
+          totalScore: t.scores?.total || 0,
+          correctAnswers: t.correctAnswers?.total || 0,
+          completionTime: t.completionTime || 0,
+          status: t.status || (t.progress?.game3Submitted ? 'FINISHED' : 'PLAYING'),
+          updatedAt: t.lastActive || 0
+        }));
+      }
+
+      // Sort: 1. Total Score DESC, 2. Correct Answers DESC, 3. Completion Time ASC
+      list.sort((a, b) => {
+        const scoreA = Number(a.totalScore) || 0;
+        const scoreB = Number(b.totalScore) || 0;
+        if (scoreB !== scoreA) {
+          return scoreB - scoreA;
+        }
+
+        const corrA = Number(a.correctAnswers) || 0;
+        const corrB = Number(b.correctAnswers) || 0;
+        if (corrB !== corrA) {
+          return corrB - corrA;
+        }
+
+        const timeA = Number(a.completionTime) || 0;
+        const timeB = Number(b.completionTime) || 0;
+        return timeA - timeB;
+      });
+
+      return list;
+    };
+
+    return this.listenToSession(cleanCode, (session) => {
+      const sortedList = compileLeaderboard(session);
+      callback(sortedList, session);
+    });
   }
 
   /**

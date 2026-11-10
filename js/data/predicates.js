@@ -51,10 +51,12 @@ export const PREDICATES = [
   }
 ];
 
-export function getPredicate(score) {
-  const rounded = Math.round(Number(score) || 0);
+export function getPredicate(score, maxScore = 2760) {
+  const num = Number(score) || 0;
+  // If score is using the 100-point-per-question system (> 100), convert to percentage
+  const pct = num > 100 ? Math.min(100, Math.round((num / maxScore) * 100)) : Math.round(num);
   for (const p of PREDICATES) {
-    if (rounded >= p.min && rounded <= p.max) {
+    if (pct >= p.min && pct <= p.max) {
       return p;
     }
   }
@@ -62,6 +64,9 @@ export function getPredicate(score) {
 }
 
 export const GAME_MAX_SCORES = {
-  game2: 50, // Babak 1: Start Champ (Matching Concept)
-  game3: 50  // Babak 2: Cryptarithm War (Formula Puzzles)
+  game1: 600,  // Number Chains (5 soal × 100 + bonus)
+  game2: 1440, // Start Champ (12 soal × 100 + bonus)
+  game3: 720   // Cryptarithm War (6 soal × 100 + bonus)
 };
+
+export const TOTAL_MAX_SCORE = 2760;
