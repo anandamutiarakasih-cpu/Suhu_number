@@ -306,7 +306,7 @@ class ChampionsOfCalorApp {
         break;
 
       case 'waiting':
-        preloadStyle('css/game1.css?v=2.4');
+        preloadStyle('css/game1.css?v=2.5');
         this.currentViewInstance = renderWaitingView(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,
@@ -329,8 +329,8 @@ class ChampionsOfCalorApp {
         break;
 
       case 'game1':
-        loadStyle('css/game1.css?v=2.4');
-        preloadStyle('css/game2.css?v=2.4');
+        loadStyle('css/game1.css?v=2.5');
+        preloadStyle('css/game2.css?v=2.5');
         this.currentViewInstance = renderGame1View(this.appContainer, {
           sessionCode: this.state.sessionCode,
           teamNumber: this.state.teamNumber,

@@ -14,7 +14,7 @@ import { networkService } from '../services/network-service.js';
 import { loadStyle } from '../utils/asset-loader.js';
 
 export function renderGame1View(container, { sessionCode, teamNumber, onGameCompleted, onPhaseChange, onResetToHome, onNextGame }) {
-  loadStyle('css/game1.css?v=2.4');
+  loadStyle('css/game1.css?v=2.5');
   let currentStageIndex = 0;
   let stageCards = [];
   let userOrder = {}; // cardIdx (0..4) -> step (1..5)
@@ -60,14 +60,26 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     return [1, 2, 3, 4, 5].map((step) => {
       const foundCardIdx = Object.keys(userOrder).find((k) => userOrder[k] === step);
       const isFilled = foundCardIdx !== undefined && userOrder[foundCardIdx] !== null;
-      const letter = isFilled ? String.fromCharCode(65 + parseInt(foundCardIdx, 10)) : '';
-      const text = isFilled ? stageCards[parseInt(foundCardIdx, 10)] : 'Belum ditentukan (pilih nomor pada kartu di atas)';
+      const cardNum = isFilled ? parseInt(foundCardIdx, 10) : null;
+      const letter = isFilled ? String.fromCharCode(65 + cardNum) : '';
+      const text = isFilled ? stageCards[cardNum] : 'Belum ditentukan — sentuh angka di kartu peristiwa untuk mengisi langkah ini';
 
       return `
-        <div class="tc-preview-step-row ${isFilled ? 'filled' : ''}">
-          <div class="tc-preview-step-num">${step}</div>
-          <div class="tc-preview-step-text ${isFilled ? '' : 'empty'}">
-            ${isFilled ? `<strong>[Peristiwa ${letter}]</strong> ${text}` : text}
+        <div class="tc-preview-step-row ${isFilled ? 'filled' : 'empty'}">
+          <div class="tc-preview-step-badge">
+            <span class="tc-preview-step-digit">${step}</span>
+            <span class="tc-preview-step-lbl">Langkah</span>
+          </div>
+          <div class="tc-preview-step-content">
+            ${isFilled ? `
+              <div class="tc-preview-event-tag">📌 PERISTIWA ${letter}</div>
+              <div class="tc-preview-text">${text}</div>
+            ` : `
+              <div class="tc-preview-empty-hint">⏳ ${text}</div>
+            `}
+          </div>
+          <div class="tc-preview-status-icon">
+            ${isFilled ? '<span class="tc-check-dot" title="Sudah terisi">✓</span>' : '<span class="tc-wait-dot" title="Menunggu pilihan">⋯</span>'}
           </div>
         </div>
       `;
@@ -117,28 +129,53 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
 
         <!-- Simple Guide Pill -->
         <div class="tc-chain-howto-pill">
-          <span>🔢 <strong>Cara Bermain:</strong> Pada tiap kartu peristiwa, klik angka <strong>1, 2, 3, 4, atau 5</strong> untuk menentukan urutan langkahnya dari awal hingga akhir.</span>
+          <span>🔢 <strong>Cara Bermain:</strong> Pada tiap kartu peristiwa, sentuh angka <strong>1, 2, 3, 4, atau 5</strong> pada <strong>Kolom Jawaban</strong> untuk menentukan urutan langkah terjadinya dari awal sampai akhir.</span>
         </div>
 
-        <!-- Cards List (Direct Number Input) -->
+        <!-- Cards List (Direct Number Input - Lebar Menyesuaikan Android & iOS) -->
         <div class="tc-chain-list" id="chain-cards-container">
           ${stageCards.map((text, idx) => `
             <div class="tc-chain-card" id="chain-card-${idx}" data-idx="${idx}">
               <div class="tc-card-top-row">
-                <div class="tc-event-tag">PERISTIWA ${String.fromCharCode(65 + idx)}</div>
+                <div class="tc-event-tag">
+                  <span class="tc-event-icon">📌</span>
+                  <span>PERISTIWA ${String.fromCharCode(65 + idx)}</span>
+                </div>
                 <div class="tc-status-tag" id="status-tag-${idx}">
-                  <span class="tc-badge-empty">BELUM DIURUTKAN</span>
+                  <span class="tc-badge-empty">⚪ BELUM DIURUTKAN</span>
                 </div>
               </div>
+
               <div class="tc-card-desc">${text}</div>
-              <div class="tc-card-input-row">
-                <span class="tc-input-label">PILIH URUTAN LANGKAH:</span>
+
+              <!-- Dedicated Full-Width Kolom Jawaban -->
+              <div class="tc-card-answer-box">
+                <div class="tc-answer-header">
+                  <div class="tc-answer-title-group">
+                    <span class="tc-answer-label">🎯 KOLOM JAWABAN:</span>
+                    <span class="tc-answer-hint">Pilih urutan langkah terjadinya peristiwa ini (1–5)</span>
+                  </div>
+                  <div class="tc-chosen-pill" id="chosen-pill-${idx}">
+                    <span class="tc-chosen-prefix">Nomor Dipilih:</span>
+                    <span class="tc-chosen-val empty" id="chosen-val-${idx}">Belum Ada</span>
+                  </div>
+                </div>
+
+                <!-- 5-Number Grid Touch Buttons (Besar, Jelas, & Responsif) -->
                 <div class="tc-btn-group-nums" data-card="${idx}">
                   ${[1, 2, 3, 4, 5].map((n) => `
-                    <button type="button" class="tc-num-choice-btn" data-card="${idx}" data-val="${n}" title="Jadikan urutan ke-${n}">
-                      ${n}
+                    <button type="button" class="tc-num-choice-btn" data-card="${idx}" data-val="${n}" aria-label="Jadikan urutan ke-${n}" title="Jadikan urutan ke-${n}">
+                      <span class="tc-num-check">✓</span>
+                      <span class="tc-num-digit">${n}</span>
+                      <span class="tc-num-label">Ke-${n}</span>
                     </button>
                   `).join('')}
+                </div>
+
+                <!-- Status Feedback Footnote -->
+                <div class="tc-answer-feedback" id="answer-feedback-${idx}">
+                  <span class="tc-fb-icon">💡</span>
+                  <span class="tc-fb-text" id="fb-text-${idx}">Sentuh salah satu nomor di atas untuk menetapkan urutan langkah.</span>
                 </div>
               </div>
             </div>
@@ -245,6 +282,8 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
     cardEl.classList.remove('correct', 'wrong');
 
     const val = userOrder[idx];
+    const letter = String.fromCharCode(65 + idx);
+
     if (val !== null) {
       cardEl.classList.add('filled');
     } else {
@@ -258,13 +297,35 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
       btn.classList.toggle('active', bVal === val);
     });
 
-    // Update Status Badge
+    // Update Chosen Number Display Pill (Menampilkan Angka Nomor yg Dipilih Siswa)
+    const chosenValEl = cardEl.querySelector(`#chosen-val-${idx}`);
+    if (chosenValEl) {
+      if (val !== null) {
+        chosenValEl.className = 'tc-chosen-val active';
+        chosenValEl.innerHTML = `<strong class="tc-chosen-number">${val}</strong> <span class="tc-chosen-sub">(Langkah ke-${val})</span>`;
+      } else {
+        chosenValEl.className = 'tc-chosen-val empty';
+        chosenValEl.innerHTML = `Belum Ada`;
+      }
+    }
+
+    // Update Status Badge at Card Top
     const statusEl = cardEl.querySelector(`#status-tag-${idx}`);
     if (statusEl) {
       if (val !== null) {
-        statusEl.innerHTML = `<span class="tc-badge-filled">URUTAN KE-${val}</span>`;
+        statusEl.innerHTML = `<span class="tc-badge-filled">✨ URUTAN KE-${val}</span>`;
       } else {
-        statusEl.innerHTML = `<span class="tc-badge-empty">BELUM DIURUTKAN</span>`;
+        statusEl.innerHTML = `<span class="tc-badge-empty">⚪ BELUM DIURUTKAN</span>`;
+      }
+    }
+
+    // Update Footnote Feedback Text
+    const fbTextEl = cardEl.querySelector(`#fb-text-${idx}`);
+    if (fbTextEl) {
+      if (val !== null) {
+        fbTextEl.innerHTML = `✓ <strong>Peristiwa ${letter}</strong> dipilih sebagai <strong>Urutan Langkah ke-${val}</strong>. (Ketuk lagi untuk membatalkan)`;
+      } else {
+        fbTextEl.textContent = 'Sentuh salah satu nomor di atas untuk menetapkan urutan langkah.';
       }
     }
   }
@@ -333,6 +394,7 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
       const cardEl = container.querySelector(`#chain-card-${i}`);
       const statusEl = container.querySelector(`#status-tag-${i}`);
 
+      const fbTextEl = cardEl ? cardEl.querySelector(`#fb-text-${i}`) : null;
       if (userRank === correctRank) {
         if (cardEl) {
           cardEl.classList.add('correct');
@@ -340,6 +402,9 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
         }
         if (statusEl) {
           statusEl.innerHTML = `<span class="tc-eval-badge correct">✓ Tepat (Langkah ke-${userRank})</span>`;
+        }
+        if (fbTextEl) {
+          fbTextEl.innerHTML = `🎉 <strong>Tepat Sempurna!</strong> Peristiwa ${String.fromCharCode(65 + i)} memang berada di <strong>Langkah ke-${userRank}</strong>.`;
         }
       } else {
         allCorrect = false;
@@ -349,6 +414,9 @@ export function renderGame1View(container, { sessionCode, teamNumber, onGameComp
         }
         if (statusEl) {
           statusEl.innerHTML = `<span class="tc-eval-badge wrong">✕ Posisi Belum Tepat</span>`;
+        }
+        if (fbTextEl) {
+          fbTextEl.innerHTML = `⚠️ Urutan ke-${userRank} belum sesuai alur ilmiah. Silakan ganti ke nomor langkah yang tepat!`;
         }
       }
     }
